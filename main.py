@@ -1,17 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from api.chat_router import router as chat_router
-import uuid
-import structlog
 from core.logger import logger
 
 app = FastAPI(title="LLM练习SSE")
 # 注册路由，这是重点
 app.include_router(chat_router)
 
-# @app.middleware("http")
-# async def add_request_id_middleware(request: Request, call_next):
-#     request_id = str(uuid.uuid4())
 # 全局异常处理器
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -25,3 +20,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+# main函数中创建fastapi应用，注册chat_router这个路由，额外定义全局异常处理来捕获没写的异常
+# 

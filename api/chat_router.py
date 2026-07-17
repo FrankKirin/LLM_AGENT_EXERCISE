@@ -1,3 +1,4 @@
+# 路由具体实现
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict
@@ -14,16 +15,20 @@ class ChatRequest(BaseModel):
 
 def stream_generator(messages):
     # 用请求参数调用流式接口，strem保存respnose
+    # token_usage会在最后一个Done之前发送，并且这个choices内容是空数组
     try:
         stream = llm_stream_chat(messages)
+        total_tokens = None
         for chunk in stream:
-            # print("chunk结构:", chunk.model_dump())
             if chunk.choices and chunk.choices[0].delta.content:
                 content = chunk.choices[0].delta.content
                 # SSE标准格式
                 yield f"data: {content}\n\n"
                 # yield f"data: {content}\n"
             # SSE流结束标志
+            if not chunk.choices[0].delta.content and chunk.usage:   # 方式1: 标准防御性写法
+                total_tokens = chunk.usage.total_tokens
+                print(f"本次使用的tokens数为:{total_tokens}")
             yield "data: [DONE]\n\n"
             # yield "data: [DONE]\n"
     except Exception as e:
