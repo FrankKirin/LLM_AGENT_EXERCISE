@@ -1,11 +1,13 @@
 from openai import OpenAI
 from core.config import settings
 import json
+from core.logger import logger
 
 # 只设置了base_url和api_key是为什么？
 client = OpenAI(
     api_key = settings.LLM_API_KEY,
     base_url = settings.LLM_BASE_URL,
+    timeout = settings.LLM_TIMEOUT
 )
 
 prompt = """
@@ -16,20 +18,46 @@ schema:
     "intent": str,
     "param": {"order_id": str | null}
 }
-用户问题：{question}
+用户问题：__QUESTION__
 一步一步给出思考
 """
 
-# question = "帮我查询OD20260701这个工单状态"
-question = "帮我查询KCJ201842这个客户信息"
 
-response = client.chat.completions.create(
-    messages = [{
-        "role": "user",
-        "content": prompt.format(question=question)
-    }],
-    model = settings.LLM_MODEL,
-    temperature=0.1
-)
+def get_answer_fromllm(question: str):
 
-print(response.choices[0].message.content)
+    # 1.优秀的开发者会习惯性把Prompt渲染结果记录下来(DEBUG级别)
+    rendered_prompt = prompt.replace("__QUESTION__", question)
+    logger.debug(f"Rendered Prompt: {rendered_prompt}")
+
+    response = client.chat.completions.create(
+        messages = [
+            {"role": "user","content":rendered_prompt}
+        ],
+        model = settings.LLM_MODEL,
+        temperature=0.1
+    )
+    raw_content = response.choices[0].message.content
+
+    # 解析前，留下审计日志
+    logger.debug(f"LLM Raw Response: {raw_content}")
+
+    if raw_content is None:
+        logger.warning("LLM返回的content是None！可能触发了工具调用或被安全策略拦截。")
+        return None
+    else:
+        try:
+            return raw_content
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败！错误原因：{e.msg}")
+            logger.error(f"完整数据如下：\n {raw_content}")
+
+if __name__ == "__main__":
+    test_list = [
+        "帮我查工单OD20260701",
+        "客户C1001信息",
+        "Agent是什么东西"
+    ]
+    for q in test_list:
+        print("+"*30)
+        res = get_answer_fromllm(q)
