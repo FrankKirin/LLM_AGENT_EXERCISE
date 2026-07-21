@@ -22,9 +22,9 @@ def simple_fc_run(user_query: str):
     如果需要用工具，调用工具
     如果不调用工具，返回答案
     """
-    tools_text = json.dumps(TOOLS_DEF)  # dumps把python对象把包成字符串发出去
+    tools_text = json.dumps(TOOLS_DEF, ensure_ascii=False)  # dumps把python对象把包成字符串发出去
     formated_prompt = PROMPT.replace("__TOOLSINFO__", tools_text).replace("__QUERY__", user_query)
-    logger.debug(f"处理后的prompt内容: f{formated_prompt}")
+    logger.debug(f"处理后的prompt内容: {formated_prompt}")
     chat = client.chat.completions.create(
         model=settings.LLM_MODEL,
         # 从来没说过message需要返回json格式的prompt作为content
@@ -33,17 +33,18 @@ def simple_fc_run(user_query: str):
     )
 
     raw = chat.choices[0].message.content
+    logger.debug(f"LLM原始返回内容：{raw}")
 
-    if not raw:
+    if raw:
+        # python中 非空 字符串的布尔值是True
         # 1.如果LLM判断是问题，直接回答
         # 2.如果LLM判断需要function回答，获取function需要的参数，再调用LLM重新组织语言
-        logger.debug(f"LLM原始返回内容：{raw}")
         try:
             res = json.loads(raw)
-            logger.debug(f"LLM原始返回内容被json loads载入后内容:{res}")
             need_tool = res["need_call"]
-            logger.debug(f"非函数调用类型,直接回答问题: {res['answer']}")
+            logger.debug(f"LLM返回的need_tool的值: {need_tool}")
             if not need_tool:
+                logger.debug(f"非函数调用类型,直接回答问题: {res['answer']}")
                 return res["answer"]
             # 这里不写else是因为if里是一句return，直接返回
             tool_name = res["tool_name"]
@@ -57,7 +58,7 @@ def simple_fc_run(user_query: str):
             # 看一下这里有f和没有f有什么区别
             summary_promt = f"""
             用户问题: {user_query}
-            工具返回数据: {json.dumps(tool_data)}
+            工具返回数据: {json.dumps(tool_data, ensure_ascii=False)}
             根据数据简单回答用户问题
             """
 
@@ -67,15 +68,14 @@ def simple_fc_run(user_query: str):
                 temperature=0.3
             )
 
-            if not final.choices[0]:
+            if final.choices[0]:
                 final_res = final.choices[0].message.content
-                logger.debug(f"调用函数返回的内容为{final_res}")
-                return res
+                logger.debug(f"调用函数返回的内容为: {final_res}")
+                return final_res
 
-        except Exception as e:
+        except json.JSONDecodeError as e:
             logger.error("手动FC解析失败", error=str(e))
             return "指令解析失败，请重新提问"
-
     else:
         logger.debug(f"LLM返回None")
         return None

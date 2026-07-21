@@ -22,6 +22,19 @@ client = OpenAI(
     )
 )
 
+def llm_chat_with_tools(messages: list, tools: list = None):
+    """同步接口，支持原生Function Calling"""
+    resp = client.chat.completions.create(
+        model = settings.LLM_MODEL,
+        messages=messages,
+        tools = tools,
+        tool_choice="auto", # auto 表示有现成tool，none 表示没有现成tool
+        stream=False,
+        timeout=settings.LLM_TIMEOUT
+    )
+    return resp
+
+
 def llm_stream_chat(messages: list):
     logger.info("发起LLM流式请求", messages=messages)
     stream = client.chat.completions.create(

@@ -1,5 +1,3 @@
-
-
 # 模拟工单数据库
 MOCK_ORDER_DB = {
     "OD20260701": {"status": "处理中", "handler": "产品专员张三", "create_time": "2026-07-01"},
@@ -32,26 +30,30 @@ def query_customer_id(customer_id: str):
 TOOLS_DEF = [
     {
         "type":"function",
-        "name": "query_order_info",
-        "description": "查询工单详情，需要传入order_id",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "order_id":{"type":"string", "description":"工单编号"}
-            },
-            "required":["order_id"] # 没看明白，为什么用了[]包起来，为的是多个args也能使用这个结构
+        "function":{
+            "name": "query_order_info",
+            "description": "查询工单详情，需要传入order_id",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id":{"type":"string", "description":"工单编号"}
+                },
+                "required":["order_id"] # 没看明白，为什么用了[]包起来; 答案：为的是多个args也能使用这个结构
+            }
         }
     },
     {
         "type":"function",
-        "name": "query_customer_id",
-        "description": "查询客户信息，需要customer_id",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "customer_id": {"type":"string", "description": "客户编号"}
-            },
-            "required":["customer_id"]
+        "function":{
+            "name": "query_customer_id",
+            "description": "查询客户信息，需要customer_id",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {"type":"string", "description": "客户编号"}
+                },
+                "required":["customer_id"]
+            }
         }
     }
 ]
