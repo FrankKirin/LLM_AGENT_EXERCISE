@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import SecretStr
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="UTF-8")
     
     LLM_BASE_URL: str = ""
-    LLM_API_KEY: str = ""
+    # 防止密钥在打日志时意外被明文打出来
+    LLM_API_KEY: SecretStr = SecretStr("")
     LLM_MODEL: str = ""
     LLM_TIMEOUT: int = 1
     MAX_RETRY_TIMES: int = 1

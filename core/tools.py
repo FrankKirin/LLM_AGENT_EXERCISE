@@ -19,7 +19,7 @@ def query_order_info(order_id: str):
     """
     return MOCK_ORDER_DB.get(order_id, {"msg":"未查询到该工单"})
 
-def query_customer_id(customer_id: str):
+def query_customer_info(customer_id: str):
     """
     根据客户id查询客户信息
     :param: customer_id
@@ -45,7 +45,7 @@ TOOLS_DEF = [
     {
         "type":"function",
         "function":{
-            "name": "query_customer_id",
+            "name": "query_customer_info",
             "description": "查询客户信息，需要customer_id",
             "parameters": {
                 "type": "object",
@@ -61,5 +61,5 @@ TOOLS_DEF = [
 # 工具名称映射函数，用户反射调用
 TOOLS_MAP = {
     "query_order_info": query_order_info,
-    "query_customer_info": query_customer_id
+    "query_customer_info": query_customer_info
 }
