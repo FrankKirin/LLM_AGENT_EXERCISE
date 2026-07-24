@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 client = OpenAI(
     base_url = settings.LLM_BASE_URL,
-    api_key = settings.LLM_API_KEY,
+    api_key = str(settings.LLM_API_KEY),
     timeout = settings.LLM_TIMEOUT
 )
 
