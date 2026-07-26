@@ -8,6 +8,7 @@ client = OpenAI(
 
 response = client.chat.completions.create(
     model = "deepseek-v4-flash", # 指定模型
+    # model = "deepseek-v4-pro", # 指定模型
     messages = [              # 对话历史
         {"role": "system", "content": "You are a helpful assistant"},   # 系统提示词
         {"role": "user", "content": "对于锂电池来说，浅充浅放能延长寿命，是否定期也需要充满？"},   # 用户输入的内容
