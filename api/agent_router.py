@@ -18,7 +18,5 @@ async def agent_chat(req: AgentChatReq):
             "data": {"reply":reply}
         }
     except Exception as e:
-        raise HTTPException(status=500, detail=f"智能体执行异常：{str(e)}")
-
-
+        raise HTTPException(status_code=500, detail=f"智能体执行异常：{str(e)}")
 

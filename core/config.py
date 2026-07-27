@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     LLM_TIMEOUT: int = 1
     MAX_RETRY_TIMES: int = 1
 
+    # Embedding模型配置
+    LLM_EMBEDDING_BASE_URL: str = ""
+    LLM_EMBEDDING_API_KEY: SecretStr = SecretStr("")
+    LLM_EMBEDDING_MODEL: str = ""
+
+    # Langsmith配置
     LANGCHAIN_TRACING_V2: str = "true"
     LANGCHAIN_API_KEY: str = ""
     LANGCHAIN_PROJECT: str = "default"
