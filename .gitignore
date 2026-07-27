@@ -51,4 +51,4 @@ htmlcov/
 Thumbs.db
 
 #
-.pdf
+*.pdf
