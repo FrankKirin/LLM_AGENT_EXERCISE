@@ -5,9 +5,8 @@ from langchain_core.tools import tool
 from core.tools import query_customer_info, query_order_info
 from core.logger import logger
 
-
 # 创建ChatOpenAI
-client = ChatOpenAI(
+llm = ChatOpenAI(
     base_url=settings.LLM_BASE_URL,
     model = settings.LLM_MODEL,
     api_key = settings.LLM_API_KEY,

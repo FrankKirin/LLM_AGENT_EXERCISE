@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from api.chat_router import router as chat_router
 from api.tool_router import router as tool_router
+from api.rag_router import router as rag_router
 from core.logger import logger
 from core.llm_client import llm_chat_with_tools
 from api.chat_router import router as agent_router
@@ -13,6 +14,7 @@ app = FastAPI(title="LLM练习SSE")
 app.include_router(chat_router)
 app.include_router(tool_router)
 app.include_router(agent_router)
+app.include_router(rag_router)
 load_dotenv()
 
 # 全局异常处理器

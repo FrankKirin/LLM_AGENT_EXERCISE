@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from core.config import settings
@@ -28,6 +28,7 @@ rag_prompt = ChatPromptTemplate.from_messages([
     ("human", "{question}")
 ])
 
+
 # 构建Runnable管道
 retriever = get_retriever() # 拿到List[Document]
 
@@ -41,6 +42,22 @@ rag_chain = (
     | llm
     | StrOutputParser()
 )
+
+# 带历史对话的RAG
+contextual_prompt = ChatPromptTemplate.from_messages([
+    ("system", "根据对话历史，重构用户问题，使其具备独立语义，不要回答问题，只输出重构后的问题"),
+    MessagesPlaceholder("history"),     # 动态插入历史
+    ("human", "{question}")
+])
+# 问题重构链
+rewrite_chain = contextual_prompt | llm | StrOutputParser()
+
+async def chat_rag_chain(history, question):
+    # Step1.重构问题
+    new_question = rewrite_chain.invoke({"history": history, "question": question})
+    # Step2. 检索+回答
+    return rag_chain.ainvoke(new_question)
+
 
 if __name__ == "__main__":
     print("="*20 + "开始RAG链路测试" + "="*20)
