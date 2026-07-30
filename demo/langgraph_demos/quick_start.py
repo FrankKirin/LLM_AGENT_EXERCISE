@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from core.logger import logger
 from core.config import settings
 from typing_extensions import TypedDict, Annotated
-from langchain.messages import AnyMessage, SystemMessage
+from langchain.messages import AnyMessage, SystemMessage, HumanMessage
 import operator
 from langchain.messages import ToolMessage
 from typing import Literal
@@ -54,6 +54,7 @@ def divide(a: int, b: int) -> float:
 # 这里的tools是个tool函数对象列表，不是简单的函数名称列表
 tools = [multiply, add, divide]
 tools_by_name = {tool.name: tool for tool in tools}
+logger.debug(f"tools_by_name内容：{tools_by_name}")
 
 # llm绑定工具
 model_with_tools = llm.bind_tools(tools)
@@ -68,24 +69,24 @@ class MessagesState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
     llm_calls: int
 
-# 模型节点
-def llm_call(state: dict):
-    return {
-        "messages": [
-            model_with_tools.invoke(
-                [
-                    SystemMessage(
-                        content="You are a helpful assistant tasked with performing arithmetic on a set of input"
-                    )
-                ] + state["messages"]
-            )
-        ],
-        # 记录llm_calls防止无限循环与成本控制
-        "llm_calls": state.get("llm_calls", 0) + 1
-    }
+# 模型节点,节点功能为根据所有过去的Messages生成新的回复
+# def llm_call(state: dict):
+def llm_call(state: MessagesState):
+    # 有个问题是每次都会塞SystemMessage，实际上只要塞一次就够
+    state["llm_calls"] = state.get("llm_calls", 0) + 1
+    if state["llm_calls"] == 1:
+        system_prompt = SystemMessage(content="You are a helpful assistant tasked with performing arithmetic on a set of input")
+        messages = [system_prompt] + state["messages"]
+    else:
+        messages = state["messages"]
+    res = model_with_tools.invoke(messages)     # 这是一条AIMessage
+    logger.debug(f"llm_call后调用的内容{res}")
+    # Langgraph支持多种返回机制: LangGraph字典和Message对象, 字典是图里的全局对象
+    return {"messages":[res], "llm_calls":state["llm_calls"]}
 
 # 定义tool节点
-def tool_node(state: dict):
+# def tool_node(state: dict):
+def tool_node(state: MessagesState):
     result = []
     logger.debug("state['messages'][-1]内容:", content=state['messages'][-1])
     for tool_call in state["messages"][-1].tool_calls:
@@ -95,14 +96,11 @@ def tool_node(state: dict):
         result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
     return {"messages": result}
 
-# 路由函数
-# 返回类型没看懂
+# 路由函数，返回内容表示只能“tool_node或者END”
 def should_continue(state: MessagesState) -> Literal["tool_node", END]:
     """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
 
-    messages = state["messages"]
-    logger.debug("state['messages']里装了啥：", res=messages)
-    last_message = messages[-1]
+    last_message = state["messages"][-1]
     logger.debug("last['messages']里装了啥：", res=last_message)
 
     # 如果LLM执行tool call，执行一个操作
@@ -115,6 +113,28 @@ def should_continue(state: MessagesState) -> Literal["tool_node", END]:
 
 if __name__ == "__main__":
     logger.debug("tools_by_name属性",res=tools_by_name, type=type(tools_by_name))
+    """
+    # @tool可以通过invoke方法来调试
+    print(multiply.invoke({"a":3, "b":4}))
+
+    msg = model_with_tools.invoke(
+        [
+            HumanMessage(content="3 乘以 4等于多少？")
+        ]
+    )
+    logger.debug("The content of msg tool_calls result", msg=msg.tool_calls)
+    
+    # 搭个最小图来跑通
+    builder = StateGraph(MessagesState)
+    builder.add_node("llm_call", llm_call)
+    builder.add_edge(START, "llm_call")
+    builder.add_edge("llm_call", END)
+    graph = builder.compile()
+
+    # 本质invoke函数传入的数据就是定义的MessageState
+    result = graph.invoke({"messages":[HumanMessage(content="你好")]})
+    print(result)
+    """
 
     # 构造workflow
     agent_builder = StateGraph(MessagesState)
@@ -141,7 +161,6 @@ if __name__ == "__main__":
     Path("agent_graph.png").write_bytes(
         agent.get_graph(xray=True).draw_mermaid_png()
     )
-
 
     # Invoke
     from langchain.messages import HumanMessage
