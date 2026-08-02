@@ -19,20 +19,17 @@ async def agent_node(state: ReActState):
     return {"messages": [result]}
 
 # ToolNode要求State必须包含messages字段，且最后一条带tool_calls的AIMessage
-too_node = ToolNode(tools)
+tool_node_func = ToolNode(tools)
 
 def handle_tool_error(state: ReActState)->dict:
     error = state.get("error")
     tool_calls = state["messages"][-1].tool_calls
     return {
-        "messages": [
-            ToolMessage(
-                content=f"工具执行出错：{repr(error)}, 请换一种方式提问",
-                tool_call_id=tc["id"]
-            )
-            for tc in tool_calls
-        ]
+        "messages": [ToolMessage(content=f"工具执行出错：{repr(error)}, 请换一种方式提问", tool_call_id=tc["id"]) for tc in tool_calls]
     }
+
+# 带错误兜底的工具节点
+tool_node_with_retry = ToolNode(tools, handle_tool_errors=handle_tool_error)
 
 # async def execute_tool_node(state: ReActState):
 #     tool_calls_res = state["messages"][-1].tool_calls
