@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, AnyMes
 from core.lc_baseline import llm, tools
 from core.logger import logger
 from langgraph.graph import StateGraph, START, END
+from core.config import settings
 
 # 定义节点类
 # 1.给字典加上IDE自动补全 2.告诉langgraph图的状态结构
@@ -17,6 +18,7 @@ llm_with_tool = llm.bind_tools(tools)
 
 def llm_tool(state: ReactState):
     messages = state["messages"]
+    logger.debug(f"这是第{state.get('call_num', 0)+1}调用llm_tool")
     return {
         "messages": [llm_with_tool.invoke(messages)],
         "call_num": state.get("call_num", 0) + 1
@@ -47,11 +49,11 @@ def tool_node(state: ReactState):
         logger.debug("打印tool_node中for循环tool的内容", tool=tool)
         func = tools_with_name[tool["name"]]
         res = func.invoke(tool["args"])
-        final_res.append(res)
+        final_res.append(ToolMessage(content=res, tool_call_id=tool["id"]))   # 规定res必须构造一条ToolMessage然后返回
 
     logger.debug("tool_node函数中final_res结果为", final_res=final_res)
 
-    return {"message": final_res}
+    return {"messages": final_res}
 
 
 # 构建graph方法
@@ -70,6 +72,8 @@ def build_graph():
         # 如果should_continue返回"tool_node"就走tool_node，否则就END
         ["tool_node", END]
     )
+    # 构成tool_node和llm_tool循环
+    agent_builder.add_edge("tool_node", "llm_tool")
 
     return agent_builder.compile()
 
@@ -79,10 +83,5 @@ if __name__ == "__main__":
     state = {"messages": [HumanMessage(content="工号C1001员工的信息")]}
     graph = build_graph()
     result = asyncio.run(graph.ainvoke(state))
-    print(result)
-
-
-    # state = {"messages": [HumanMessage(content="员工工号C1001的信息")]}
-    # res = should_continue(state)
-
-    # print(res)
+    print("*"*100)
+    print(result["messages"][-1].content)

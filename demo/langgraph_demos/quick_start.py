@@ -94,6 +94,7 @@ def tool_node(state: MessagesState):
         observation = tool.invoke(tool_call["args"])
         logger.debug("observation内容:", observation=observation)
         result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
+        logger.debug("result完整内容：", res=result)
     return {"messages": result}
 
 # 路由函数，返回内容表示只能“tool_node或者END”
