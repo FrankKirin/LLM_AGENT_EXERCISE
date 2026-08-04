@@ -8,6 +8,7 @@ from api.rag_router import router as rag_router
 from core.logger import logger
 from core.llm_client import llm_chat_with_tools
 from api.chat_router import router as agent_router
+from api.agent_router import router as agent_react_router
 
 app = FastAPI(title="LLM练习SSE")
 # 注册路由，这是重点
@@ -15,6 +16,7 @@ app.include_router(chat_router)
 app.include_router(tool_router)
 app.include_router(agent_router)
 app.include_router(rag_router)
+app.include_router(agent_react_router)
 load_dotenv()
 
 # 全局异常处理器

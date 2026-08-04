@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from core.react_agent_new import run_react_agent
 
 # 创建router，定义好prefix
-router = APIRouter(prefix="agent", tags="ReAct智能体")
+router = APIRouter(prefix="/agent", tags=["ReAct智能体"])
 
 class AgentChatReq(BaseModel):
     session_id: str
