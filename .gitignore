@@ -55,3 +55,6 @@ Thumbs.db
 
 # 向量数据库
 chroma_db/
+
+# 所有png
+*.png
