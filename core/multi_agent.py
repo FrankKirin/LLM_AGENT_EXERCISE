@@ -105,8 +105,7 @@ async def worker_execute_node(state: MultiAgentState):
     # 找到当前worker对应的子任务
     # next()用于获取迭代器第一个元素，找不到则返回None，不会抛出StopIteration异常
     current_subtask = next(
-        (st for st in state["subtasks"] if st["assigned_worker"] == worker_key),
-        {"description": state["original_task"]}
+        (st for st in state["subtasks"] if st["assigned_worker"] == worker_key), {"description": state["original_task"]}
     )
     print(f"work_excute节点中current_subtask内容{current_subtask}")
 
@@ -147,9 +146,10 @@ async def worker_execute_node(state: MultiAgentState):
 
 
 def route_after_worker(state: MultiAgentState):
-    if state["current_worker"] == "":
+    if state["current_worker"] == "" or state["current_worker"] is None:
         return "report_aggregate"
-    else: "worker_execute"
+    else: 
+        return "worker_execute"
 
 
 async def report_aggregate_node(state: MultiAgentState):
