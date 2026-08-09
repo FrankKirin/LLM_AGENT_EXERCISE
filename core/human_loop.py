@@ -1,3 +1,4 @@
+import asyncio
 from core.config import settings
 from typing import TypedDict, Annotated
 import operator
@@ -33,7 +34,7 @@ async def task_execute_node(state: HumanLoopState):
 # 这个节点本身不做实质处理，作用是：
 # 1.作为中断点的锚点
 # 2.记录审核开始事件
-# 3.加一些前置校验llijul逻辑
+# 3.加一些前置校验逻辑
 def human_review_node(state: HumanLoopState):
     return {}
 
@@ -90,8 +91,7 @@ def build_human_loop_graph():
 
     return workflow.compile(
         checkpointer=checkpointer,
-        # human_review节点前中断
-        interrupt_before=["human_review"]
+        interrupt_before=["human_review"]   # human review之前中断，强行暂停，等待外部干预
     )
 
 async def human_approve(graph, config, feedback: str=""):
@@ -99,7 +99,7 @@ async def human_approve(graph, config, feedback: str=""):
     graph.update_state(
         config,
         {"approval_status": "approved", "human_feedback": feedback}
-    )
+    )   # 修改checkpoint中的状态
     # 传入None表示无需传入新的初始数据，直接读取当前checkpoint暂存的状态
     result = await graph.ainvoke(None, config=config)
     return result
@@ -110,6 +110,7 @@ async def human_reject(graph, config, feedback: str):
         config,
         {"approval_status": "rejected", "human_feedback": feedback}
     )
+    # None表示从checkpoint恢复当前流程
     result = await graph.ainvoke(None, config=config)
     return result
 
@@ -135,8 +136,35 @@ async def test_approve_flow():
 
     return final_result
 
+# 超时控制
+async def execute_with_timeout(task_coro, timeout_seconds: int=30):
+    pass
+
+# 权限控制
+# WORKER_PERMISSIONS： 通过Role和worker name来控制权限，字典：worker名称：role列表
+# 权限校验函数，返回bool表示是否有权限
+# - 支持多role角色
+WORKER_PERMISSIONS: dict[str, list[str]] = {
+    "research_worker": ["user", "admin"],
+    "analysis_worker": ["admin"],
+    "report_worker": ["user", "admin"],
+}
+
+def check_worker_permission(worker_name: str, user_roles: list[str]) -> bool:
+    for role in user_roles:
+        if role in WORKER_PERMISSIONS.get(worker_name, []):
+            return True
+
+    return False
+
+
+# 调用计数与限流
+class RateLimiter:
+    pass
+
+
+
 if __name__ == "__main__":
-    import asyncio
     graph = build_human_loop_graph()
     print("="*25 + "打印mermaid图" + "="*25)
     print(graph.get_graph().draw_mermaid())

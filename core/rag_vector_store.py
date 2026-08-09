@@ -38,10 +38,11 @@ CHROMA_DIR = "./chroma_db"
 
 def get_vector_store():
     """获取或创建Chroma数据库实例"""
-    return Chroma(
-        persist_directory=CHROMA_DIR,   # 实现了磁盘持久化，避免每次重置程序都要重新生成embedding
-        embedding_function=embedding    
+    chrome_builder = Chroma(
+        persist_directory=CHROMA_DIR,
+        embedding_function=embedding
     )
+    return chrome_builder
 
 def add_documents_to_vector(docs):
     """批量写入向量库"""
@@ -57,15 +58,17 @@ def get_retriever(k=4):
         search_kwargs = {"k":k}
     )
 
-if __name__ == "__main__":
-    # 文档转向量
+def init_pdf_file_to_vector(file_name: str):
     from pathlib import Path
-    # resolve()解析所有符号连接拿到真实完整路径
+    # resolve将文件的相对路径转为绝对路径
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
-    # file_location = PROJECT_ROOT.joinpath("/data/P10上下水套装版说明书.pdf") 错误写法，/开头的路径表示从根目录开始的绝对路径
-    file_location = PROJECT_ROOT/"data/P10上下水套装版说明书.pdf"
-    logger.debug("拿到扫地机器人说明书文件位置", location=file_location)
+    # PROJECT_ROOT是个PosixPath对象, 拼接直接用/
+    file_loc = PROJECT_ROOT / "data" / file_name
+    logger.debug("拿到扫地机器人说明书文件位置", location=file_loc)
 
-    # 文档分片并写到向量库
-    doc_list = load_pdf(str(file_location))
+    doc_list = load_pdf(str(file_loc))
     add_documents_to_vector(doc_list)
+
+
+if __name__ == "__main__":
+    init_pdf_file_to_vector("P10上下水套装版说明书.pdf")
