@@ -1,3 +1,5 @@
+from pathlib import Path
+from functools import lru_cache
 from langchain_openai import OpenAIEmbeddings
 from core.config import settings
 from langchain_chroma import Chroma
@@ -5,6 +7,7 @@ from core.logger import logger
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# 配置好硅基流动的embedding模型
 embedding = OpenAIEmbeddings(
     base_url=settings.LLM_EMBEDDING_BASE_URL,
     api_key=settings.LLM_EMBEDDING_API_KEY,
@@ -34,15 +37,15 @@ def load_txt(file_path: str):
     return text_splitter.split_documents(docs)
 
 # 本地持久化向量库
-CHROMA_DIR = "./chroma_db"
+CHROMA_DIR = Path(__file__).resolve().parent.parent/"core"/"chroma_db"
+GLOBAL_VECTOR_STORE = Chroma(
+    persist_directory=str(CHROMA_DIR),
+    embedding_function=embedding
+)
 
-def get_vector_store():
+def get_vector_store() -> Chroma:
     """获取或创建Chroma数据库实例"""
-    chrome_builder = Chroma(
-        persist_directory=CHROMA_DIR,
-        embedding_function=embedding
-    )
-    return chrome_builder
+    return GLOBAL_VECTOR_STORE
 
 def add_documents_to_vector(docs):
     """批量写入向量库"""
@@ -71,4 +74,9 @@ def init_pdf_file_to_vector(file_name: str):
 
 
 if __name__ == "__main__":
-    init_pdf_file_to_vector("P10上下水套装版说明书.pdf")
+    # retriever = get_retriever(k=5)
+    # res = retriever.invoke("P10保修多久？")
+    # logger.debug("rag invoke的结果", res=res, length=len(res), type_of_res=type(res))
+
+    print("="*50)
+    print(CHROMA_DIR)
