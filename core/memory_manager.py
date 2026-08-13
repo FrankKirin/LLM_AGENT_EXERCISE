@@ -36,7 +36,7 @@ class MemoryManager:
         # 长期记忆：向量存储(服用RAG的向量库)
         self.long_term :Chroma = get_vector_store()
 
-        logger.info("三级记忆管理器初始化完成", user_id=user_id)
+        logger.info("三级记忆管理器初始化完成")
 
     # 短期记忆操作
     def get_short_term(self, session_id: str) -> InMemoryChatMessageHistory:
