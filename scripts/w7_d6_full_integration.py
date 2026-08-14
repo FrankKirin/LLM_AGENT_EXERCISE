@@ -27,7 +27,7 @@ async def full_agentic_rag_with_memory(user_id: str, session_id: str, user_query
     带记忆的Agentic RAG完整流程
     这是对外的接口
     输入：
-
+        user_id, session_id, 用户问题
     处理：
 
     输出：
@@ -45,7 +45,6 @@ async def full_agentic_rag_with_memory(user_id: str, session_id: str, user_query
 
     [用户当前问题]
     {user_query}
-
     请结合用户背景和问题，进行检索和回答
     """
     # 执行Agentic RAG
@@ -103,6 +102,30 @@ async def test_integration_basic():
 
     history = memory_manager.get_short_term(session_id)
     assert len(history.messages) == 2, "应该有2条消息(用户+助手)"
+    logger.info("✅ 基础整合流程测试通过")
+
+async def test_multi_turn():
+    user_id = "multi_turn_user"
+    session_id = "session_002"
+
+    # 第一轮
+    answer1 = await full_agentic_rag_with_memory(
+        user_id, session_id,
+        "介绍一下AI Agent的基本概念"
+    )
+    logger.info(f"答案长度: {len(answer1)}")
+
+    # 第二轮
+    answer2 = await full_agentic_rag_with_memory(
+        user_id, session_id,
+        "那LangGraph又是什么?"
+    )
+    logger.info(f"答案长度: {len(answer2)}")
+
+    history = memory_manager.get_short_term(session_id)
+    logger.info(f"\n短期记忆消息数：{len(history.messages)}")
+    assert len(history.messages) == 4, "应该有4条消息(2轮对话)"
+    logger.info("✅ 多轮对话累积测试通过")
 
 
 if __name__ == "__main__":

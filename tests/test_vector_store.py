@@ -2,7 +2,7 @@
 # 测试文件名必须以test_开头，这样测试框架才能识别
 import pytest
 from langchain_core.documents import Document
-from core.rag_vector_store import add_documents_to_vector, get_retriever, get_vector_store
+from core.rag_vector_store import add_documents_to_vector, get_vector_retriever, get_vector_store
 
 if __name__ == "__main__":
     from langchain_core.documents import Document
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     print(f"当前Chroma向量库中共有 {doc_count}条数据")
 
     # 测试向量检索功能
-    retriever = get_retriever(k=2)
+    retriever = get_vector_retriever(k=2)
 
     print("====测试相关关问题检测效果=====")
     query_1 = "冰箱保修多久？"

@@ -4,7 +4,7 @@ from langchain.messages import AnyMessage, HumanMessage, ToolMessage, AIMessage
 from langgraph.graph import START, END, StateGraph
 from core.logger import logger
 from core.config import settings
-from core.rag_vector_store import get_retriever
+from core.rag_vector_store import get_vector_retriever
 from langchain_core.tools import StructuredTool
 from core.lc_baseline import tools, llm
 from langgraph.prebuilt import ToolNode
@@ -25,7 +25,7 @@ def rag_search(query: str) -> str:
        Args:
            query: 要查询的问题
     """
-    retriever = get_retriever()
+    retriever = get_vector_retriever()
     docs = retriever.invoke(query)
     # 防止无意义的rag撑爆LLM上下文
     context = "\n\n".join([doc.page_content for doc in docs[:3]])

@@ -1,13 +1,13 @@
 """
 Agentic rag是将不同检索策略封装成工具，让智能体选择调用
-对每种检索策略有明确的使用场景描述，引导只鞥难题正确选择
+对每种检索策略有明确的使用场景描述，引导智能体正确选择
 检索结果统一格式返回，包含文档内容、相似度、来源等元数据
 用StructuredTool定义工具
 """
 import json
 import operator
 from core.config import settings
-from core.rag_vector_store import get_retriever
+from core.rag_vector_store import get_vector_retriever
 from langchain_core.tools import StructuredTool
 from langgraph.prebuilt import ToolNode
 from typing import TypedDict, Annotated
@@ -19,9 +19,15 @@ from core.logger import logger
 
 # 一、统一检索结果格式
 # 设计思路：所有检索策略返回统一格式，便于后续处理和评估
-# 包含：文档内容、相似度分数、来源信息、元数据
 def format_search_results(docs: list, strategy: str)->list[dict]:
-    """统一格式化检索结果"""
+    """统一格式化检索结果
+    输入：
+        JSON格式的docs: list[Document], strategy: 向量策略
+    处理：
+        enumerate函数拼接list中每个Document数据
+    输出： 
+        [{"rank1", "content1", "metadata1", "strategy1"}, ...]
+    """
     res = []
     for i, doc in enumerate(docs):
         res.append({
@@ -46,7 +52,8 @@ def semantic_search(query: str, k: int=4) -> str:
         query: 检索查询
         k: 返回文档数量，默认为4
     """
-    retriever = get_retriever(k=k)
+    retriever = get_vector_retriever(k=k)
+    # invoke的时候会把query 先embedding然后检索
     docs = retriever.invoke(query)
     results = format_search_results(docs, "semantic")
 
@@ -65,7 +72,7 @@ def keyword_search(query: str, k: int=4)->str:
         k: 返回文档数量, 默认4
     """
     # 简化实现：用语义检索模拟，实际生产用BM25等关键词
-    retriever = get_retriever(k=k)
+    retriever = get_vector_retriever(k=k)
     docs = retriever.invoke(query)
     results = format_search_results(docs, "keyword")
     return json.dumps(results, ensure_ascii=False, indent=2)
@@ -80,7 +87,7 @@ def hybrid_search(query: str, k: int=4)->str:
         query: 检索查询
         k: 返回文档数量，默认为4
     """
-    retriever = get_retriever(k=k)
+    retriever = get_vector_retriever(k=k)
     docs = retriever.invoke(query)
     results = format_search_results(docs, "hybrid")
     return json.dumps(results, ensure_ascii=False, indent=2)
@@ -94,7 +101,7 @@ def mmr_search(query:str, k: int=4)->str:
         query: 检索查询
         k: 返回文档数量，默认4
     """
-    retriever = get_retriever(k=k)
+    retriever = get_vector_retriever(k=k, search_type="mmr")
     docs = retriever.invoke(query)
     results = format_search_results(docs, "mmr")
     return json.dumps(results, ensure_ascii=False, indent=2)
@@ -336,17 +343,3 @@ if __name__ == "__main__":
     query = "介绍一下石头扫地机器人P10的充电方式"
     graph = build_agentic_rag_graph()
 
-    print(graph.get_graph().draw_mermaid())
-
-    config = {"configurable":{"thread_id": "frank_test_001"}}
-
-    asyncio.run(
-        graph.ainvoke({
-            "messages": [HumanMessage(content=query)],
-            "original_query": query,
-            "current_query": query,
-            "retrieval_count": 0,
-            "max_retrievals": 3,
-            "is_satisfied": False,
-            "final_answer": ""
-    }, config=config))

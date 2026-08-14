@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from core.config import settings
-from core.rag_vector_store import get_retriever
+from core.rag_vector_store import get_vector_retriever
 from core.logger import logger
 
 # 创建ChatOpenAI客户端
@@ -30,7 +30,7 @@ rag_prompt = ChatPromptTemplate.from_messages([
 
 
 # 构建Runnable管道
-retriever = get_retriever() # 拿到List[Document]
+retriever = get_vector_retriever() # 拿到List[Document]
 
 def format_docs(docs):
     return "\n\n".join([d.page_content for d in docs])
