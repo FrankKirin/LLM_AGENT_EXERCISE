@@ -25,7 +25,7 @@ async def test_query_rewrite():
             "original_query": task,
             "current_query": "",
             "retrieval_count": 0,
-            "max_retrieval": 3,
+            "max_retrievals": 3,
             "is_satisfied": False,
             "final_answer": ""
         }, 
@@ -37,12 +37,12 @@ async def test_query_rewrite():
     logger.info(f"重写次数：{result['retrieval_count']}")
     logger.info(f"答案预览：{result['final_answer'][:150]}")
 
-async def test_max_retrievals_limit():
+async def test_max_retrievalss_limit():
     graph = build_agentic_rag_graph()
 
     config = {"configurable":{"thread_id":"limit_test_001"}}
 
-    # 用一个很难的问题，设置max_retrievals=2
+    # 用一个很难的问题，设置max_retrievalss=2
     task = "深度分析AI Agent未来10年的技术演进路径和商业应用格局"
 
     result = await graph.ainvoke(
@@ -51,7 +51,7 @@ async def test_max_retrievals_limit():
             "original_query": task,
             "current_query": "",
             "retrieval_count": 0,
-            "max_retrieval": 2,
+            "max_retrievals": 2,
             "is_satisfied": False,
             "final_answer": ""
         },
@@ -79,7 +79,7 @@ async def test_full_flow():
             "original_query": task,
             "current_query": "",
             "retrieval_count": 0,
-            "max_retrieval": 3,
+            "max_retrievals": 3,
             "is_satisfied": False,
             "final_answer": ""
         },
@@ -92,5 +92,5 @@ async def test_full_flow():
 
 if __name__ == "__main__":
     # asyncio.run(test_query_rewrite())
-    # asyncio.run(test_max_retrievals_limit())
+    # asyncio.run(test_max_retrievalss_limit())
     asyncio.run(test_full_flow())

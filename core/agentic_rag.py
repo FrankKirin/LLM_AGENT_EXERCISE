@@ -157,7 +157,7 @@ class AgenticRAGState(TypedDict):
     original_query: str
     current_query: str
     retrieval_count: int
-    max_retrieval: int
+    max_retrievals: int
     is_satisfied: bool
     final_answer: str
 
@@ -168,7 +168,7 @@ class AgenticRAGState(TypedDict):
 用LLM生成更精准的检索词
 """
 async def query_rewrite_node(state: AgenticRAGState):
-    if state["retrieval_count"] == "0":
+    if state["retrieval_count"] == 0:
         prompt = f"""
         请将以下用户问题改写为更适合知识库检索的查询词。
         要求:
@@ -212,7 +212,7 @@ async def agent_reasoning_node(state: AgenticRAGState):
     请检索以下问题的相关信息：
     {state['current_query']}
 
-    已检索次数：{state["retrieval_count"]} / {state["max_retrieval"]}
+    已检索次数：{state["retrieval_count"]} / {state["max_retrievals"]}
 
     注意：选择最合适的检索工具进行检索
     """)
@@ -302,7 +302,7 @@ def route_after_evaluation(state: AgenticRAGState):
     if state["is_satisfied"]:
         return "generate_answer"
     # 不满意的情况，没到达最大次数，继续检索
-    if state["retrieval_count"] >= state["max_retrieval"]:
+    if state["retrieval_count"] >= state["max_retrievals"]:
         return "generate_answer"
     return "query_rewrite"
 
@@ -346,7 +346,7 @@ if __name__ == "__main__":
             "original_query": query,
             "current_query": query,
             "retrieval_count": 0,
-            "max_retrieval": 3,
+            "max_retrievals": 3,
             "is_satisfied": False,
             "final_answer": ""
     }, config=config))

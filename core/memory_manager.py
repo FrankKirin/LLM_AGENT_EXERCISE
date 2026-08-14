@@ -31,16 +31,22 @@ class MemoryManager:
         # 中期记忆
         # key=session_id, value=摘要文本
         self.medium_term: dict[str, str] = {}
-        # 为什么中期记忆不用user_id来标识？
 
-        # 长期记忆：向量存储(服用RAG的向量库)
+        # 长期记忆：向量存储(复用RAG的向量库)
         self.long_term :Chroma = get_vector_store()
 
         logger.info("三级记忆管理器初始化完成")
 
     # 短期记忆操作
     def get_short_term(self, session_id: str) -> InMemoryChatMessageHistory:
-        """获取指定会话的短期记忆"""
+        """
+            输入：
+                session_id
+            处理：
+                查找对应session_id的短期记忆是否被创建，返回对应session_id的历史会话
+            输出：
+                InMemoryChatMessageHistory对象，通过.messages访问所有消息内容，数据结构: [AnyMessage] 
+        """
         if session_id not in self.short_term:
             self.short_term[session_id] = InMemoryChatMessageHistory()
         # 巧妙包含已有和新建的情况
@@ -61,6 +67,16 @@ class MemoryManager:
         2.拿到会话历史并进行拼接，AI和Human的都拿
         3.写好prompt，让llm进行摘要
         4.摘要存入中期记忆
+        输入：
+            用户session_id
+        处理：
+            用session_id拿到对应历史消息
+            <2，判断无需摘要
+            ≥2，构造一个列表[用户/助手:消息内容]
+            列表内容让llm去形成摘要，拿到llm返回的content作为摘要
+            摘要保存到[session_id， 摘要内容]
+        输出：
+           摘要内容summary 
         """
         history = self.get_short_term(session_id)
         messages = history.messages
@@ -68,9 +84,6 @@ class MemoryManager:
             logger.info("消息太少，无需摘要", session_id=session_id)
             return ""
 
-        # human_message = "\n".join(
-            # [str(x.content) for x in messages if x.type=="human"]
-        # )
         all_messages = "\n".join([
             f"{'用户' if m.type=='human' else '助手'}:{m.content}"
             for m in messages
@@ -101,7 +114,16 @@ class MemoryManager:
         return summary
 
     async def extract_long_term_memories(self, session_id: str) -> list[str]:
-        """从会话中提取重要事实，存入长期记忆"""
+        """从会话中提取重要事实，存入长期记忆
+        输入：
+            session_id
+        处理：
+            短期记忆拿到历史，<4 返回空，否则将历史通过llm总结为历史会话列表，按照JSON数据格式返回
+            ["记忆1", "记忆2", "记忆3", ...]
+            JSON模块将JSON数据解析为python对象, 通过Chroma实例存入向量数据库
+        输出： 
+            历史会话内容，JSON数据格式
+        """
         history = self.get_short_term(session_id)
         messages = history.messages
 
@@ -114,7 +136,7 @@ class MemoryManager:
         ])
 
         prompt = f"""
-        请从以下对话中提取值得长期记住的重要格式，格式为JSON数组：
+        请从以下对话中提取值得长期记住的重要信息，格式为JSON数组：
         - 用户的个人信息（职业、背景、偏好等）
         - 用户明确表达的喜好、习惯、观点
         - 重要的事实和知识
@@ -123,11 +145,10 @@ class MemoryManager:
         每条信息用一句话表述
 
         对话内容：
-        {message_text}
+        {message_text[:2000]}
 
         输出JSON数组格式：["记忆1", "记忆2", ...]
         """
-
         response = await llm.ainvoke(prompt)
         
         try:
@@ -151,10 +172,15 @@ class MemoryManager:
     # 记忆检索
     # 检索长期记忆(事实和偏好)，中期记忆(会话摘要)组合成上下文，注入到智能体
     def retrieve_relevant_memories(self, query: str, top_k: int=3) -> dict:
-        # 返回一个字典{"long_term":[], "summary": []}
-        # 对于long_term通过langchain封装的as_retriever
-        # 然后用search_type, 参数k和filter针对long_term数据进行检索，filter用来过滤元数据
-        # 中期记忆获取：摘取最近N个会话摘要
+        """
+            输入：
+                用户query的问题，top_k向量要求
+            处理：
+                长期记忆处理：Chroma中通过query找到k个相似的向量page_content
+                中期记忆处理: 拿到最新后3个medium_term的值列表构成中期记忆的summaries
+            输出： 
+                {"long_term": [], "summary": []}
+        """
         result = {
             "long_term": [],
             "medium_term": []
@@ -174,16 +200,16 @@ class MemoryManager:
 
         return result
 
-    def build_memory_context(self) -> str:
+    def build_memory_context(self, query: str) -> str:
         # 构建上下文字符串，用于注入到prompt中
         # 输入是用户的query，根据用户的query，搜索最相关的的长期记忆和中期摘要
         """
-        【关于用户的已知信息】
-        1. 用户是一名AI产品经理
-        2. 用户正在学习LangGraph
-
-        【最近对话摘要】
-        会话1：用户最近在学习Agent Memory...
+        输入：
+            用户query
+        处理：
+            通过用户的query，拿到相关长期记忆和中期记忆
+        输出：
+            返回长期记忆和中期记忆拼接成包含关于用户的已知信息和最近对话摘要的内容列表
         """
         memories = self.retrieve_relevant_memories(query)
 
