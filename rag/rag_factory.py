@@ -2,7 +2,7 @@ from rag.retrieval.vector_retriever import (
     SemanticRetriever, KeywordRetriever, HybridRetriever, MMRRetriever
 )
 from rag.retrieval.service import RetrievalService
-from rag.vectorstore import get_vector_store
+from rag.vectorstore.chroma import get_vector_store
 # from rag.
 from rag.tools.retrieval_tools import build_retrieval_tools as create_retrieval_tools
 

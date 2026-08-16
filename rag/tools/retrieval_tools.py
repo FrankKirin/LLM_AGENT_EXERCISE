@@ -1,7 +1,6 @@
 # 把后台复杂的检索服务，包装成AI Agent能够听懂并调用的工具
 from langchain_core.tools import tool
 from rag.retrieval.service import RetrievalStrategy, RetrievalService
-from rag.tools.retrieval_tools import build_retrieval_tools as create_retrieval_toos
 
 def build_retrieval_tools(retrieval_service:RetrievalService):
 

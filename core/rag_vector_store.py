@@ -11,6 +11,7 @@ from langchain_core.documents import Document
 from langchain_classic.retrievers import EnsembleRetriever
 from typing import Literal
 from langchain_core.retrievers import BaseRetriever
+from rich import print
 
 # 配置好硅基流动的embedding模型
 embedding = OpenAIEmbeddings(
@@ -91,13 +92,9 @@ def get_vector_retriever(
     )
 
 def get_bm25_retriever(k:int=4)->BaseRetriever:
-    documents = [
-        Document(page_content="用户正在学习LangGraph"),
-        Document(page_content="用户正在学习RAG"),
-        Document(page_content="用户喜欢使用MacBook"),
-        Document(page_content="用户想成为AI Agent工程师"),
-    ]
-    retriever = BM25Retriever.from_documents(documents)
+    vector_store = get_vector_store()
+    all_data = vector_store.get(include=["documents", "metadatas"])
+    retriever = BM25Retriever.from_documents(all_data]))
     retriever.k = k
 
     return retriever
@@ -152,4 +149,6 @@ if __name__ == "__main__":
     query = "用户有什么兴趣爱好或者偏好？"
     # test_mmr_search(query=query)
     # test_bm25_search(query, k=4)
-    test_hibird_retriever(query, k=4)
+    # test_hibird_retriever(query, k=4)
+    result = get_vector_store()
+    print(result[:3])
