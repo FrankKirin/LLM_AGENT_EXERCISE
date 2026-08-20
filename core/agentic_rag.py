@@ -7,7 +7,7 @@ Agentic rag是将不同检索策略封装成工具，让智能体选择调用
 import json
 import operator
 from core.config import settings
-from core.rag_vector_store import get_vector_retriever
+from core.rag_vector_store import get_vector_retriever, get_bm25_retriever, get_hybrid_retriever
 from langchain_core.tools import StructuredTool
 from langgraph.prebuilt import ToolNode
 from typing import TypedDict, Annotated
@@ -26,7 +26,7 @@ def format_search_results(docs: list, strategy: str)->list[dict]:
     处理：
         enumerate函数拼接list中每个Document数据
     输出： 
-        [{"rank1", "content1", "metadata1", "strategy1"}, ...]
+        list[dict(str, Any)] = [{"rank1", "content1", "metadata1", "strategy1"}, ...]
     """
     res = []
     for i, doc in enumerate(docs):
@@ -72,7 +72,7 @@ def keyword_search(query: str, k: int=4)->str:
         k: 返回文档数量, 默认4
     """
     # 简化实现：用语义检索模拟，实际生产用BM25等关键词
-    retriever = get_vector_retriever(k=k)
+    retriever = get_bm25_retriever(k=k)
     docs = retriever.invoke(query)
     results = format_search_results(docs, "keyword")
     return json.dumps(results, ensure_ascii=False, indent=2)
@@ -87,7 +87,7 @@ def hybrid_search(query: str, k: int=4)->str:
         query: 检索查询
         k: 返回文档数量，默认为4
     """
-    retriever = get_vector_retriever(k=k)
+    retriever = get_hybrid_retriever(k=k)
     docs = retriever.invoke(query)
     results = format_search_results(docs, "hybrid")
     return json.dumps(results, ensure_ascii=False, indent=2)
@@ -205,15 +205,21 @@ async def query_rewrite_node(state: AgenticRAGState):
     response = await llm.ainvoke(prompt)
     new_query = response.content.strip()
 
-    logger.debug("llm改写后的new query content:", new_query=new_query)
-
     return {
         "current_query": new_query,
         "messages": [AIMessage(content=f"查询已重写为: {new_query}")]
     }
 
 async def agent_reasoning_node(state: AgenticRAGState):
-    """智能体推理节点：决定调用哪个检索工具"""
+    """
+    输入：
+        None
+    处理：
+        Agenttic RAG提示词作为system_msg；节点中的当前查询作为human_msg
+        拼接1条system_msg和human_msg，调用绑定tool的llm
+    输出： 
+
+    """
     system_msg = SystemMessage(content=AGENTIC_RAG_PROMPT)
     human_msg = HumanMessage(content=f"""
     请检索以下问题的相关信息：
@@ -229,7 +235,7 @@ async def agent_reasoning_node(state: AgenticRAGState):
     llm_with_tools = llm.bind_tools(retrieval_tools)
     response = await llm_with_tools.ainvoke(messages)
 
-    logger.debug("response in agent reasoning", response=response)
+    logger.debug("response in agent reasoning", used_tool=[tool_call["name"] for tool_call in response.tool_calls])
 
     return {"messages": [response]}
 
@@ -248,6 +254,7 @@ async def evaluate_results_node(state: AgenticRAGState):
     # 如果没有发现有效的工具返回消息，跳过LLM评估打分流程，直接标记本次检索为“不满意”
     # 异常防御兜底与状态计数机制
     if not last_tool_msg:
+        logger.debug("evaluate node评估下来觉得检索结果不满意")
         return {"is_satisfied": False, "retrieval_count": state["retrieval_count"]+1}
 
     prompt = f"""
@@ -268,7 +275,7 @@ async def evaluate_results_node(state: AgenticRAGState):
     response = await llm.ainvoke(prompt)
     is_satisfied = "满意" in response.content and "不满意" not in response.content
 
-    logger.debug("evaluate_results node中", is_satisfied=is_satisfied, res=response)
+    logger.debug("evaluate_results node中", is_satisfied=is_satisfied)
 
     return {
         "is_satisfied": is_satisfied,
@@ -298,8 +305,6 @@ async def generate_answer_node(state: AgenticRAGState):
     """
     response = await llm.ainvoke(prompt)
 
-    logger.debug("generate answer content", res=response.content)
-
     return {
         "final_answer": response.content,
         "messages": [AIMessage(content=response.content)]
@@ -309,7 +314,7 @@ def route_after_evaluation(state: AgenticRAGState):
     if state["is_satisfied"]:
         return "generate_answer"
     # 不满意的情况，没到达最大次数，继续检索
-    if state["retrieval_count"] >= state["max_retrievals"]:
+    if state["retrieval_count"] > state["max_retrievals"]:
         return "generate_answer"
     return "query_rewrite"
 
@@ -340,6 +345,20 @@ def build_agentic_rag_graph():
 if __name__ == "__main__":
     import asyncio
 
-    query = "介绍一下石头扫地机器人P10的充电方式"
+    query1 = "介绍一下石头扫地机器人P10的充电方式"
+    query2 = "给我一个石头扫地机器人P10的异常排除方式"
     graph = build_agentic_rag_graph()
 
+    config = {"configurable":{"thread_id":"frank_test_001"}}
+
+    result = asyncio.run(graph.ainvoke({
+        "messages": [HumanMessage(content=query2)],
+        "original_query": query2,
+        "current_query": query2,
+        "retrieval_count": 0,
+        "max_retrievals": 3,
+        "is_satisfied": False,
+        "final_answer": "",
+    }, config = config))
+
+    logger.info(f"Agentic RAG给出的最后答案：{result['final_answer']}", current_query=result['current_query'])

@@ -7,13 +7,13 @@ from core.logger import logger
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 client = OpenAI(
-    base_url = settings.LLM_BASE_URL,
-    api_key = str(settings.LLM_API_KEY),
-    timeout = settings.LLM_TIMEOUT
+    base_url = settings.llm_base_url,
+    api_key = str(settings.llm_api_key),
+    timeout = settings.llm_timeout
 )
 
 @retry(
-    stop=stop_after_attempt(settings.MAX_RETRY_TIMES),
+    stop=stop_after_attempt(settings.max_retry_times),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     retry=retry_if_exception_type((APITimeoutError, APIError)),
     # 对于装饰器里的函数，使用lambda表达式可以一眼看到函数的逻辑, 且这个逻辑没有复用价值
@@ -25,12 +25,12 @@ client = OpenAI(
 def llm_chat_with_tools(messages: list, tools: list = None):
     """同步接口，支持原生Function Calling"""
     resp = client.chat.completions.create(
-        model = settings.LLM_MODEL,
+        model = settings.llm_model,
         messages=messages,
         tools = tools,
         tool_choice="auto", # auto 表示有现成tool，none 表示没有现成tool
         stream=False,
-        timeout=settings.LLM_TIMEOUT
+        timeout=settings.llm_timeout
     )
     return resp
 
@@ -38,7 +38,7 @@ def llm_chat_with_tools(messages: list, tools: list = None):
 def llm_stream_chat(messages: list):
     logger.info("发起LLM流式请求", messages=messages)
     stream = client.chat.completions.create(
-        model = settings.LLM_MODEL,
+        model = settings.llm_model,
         messages = messages,
         stream=True,
         stream_options={"include_usage": True}

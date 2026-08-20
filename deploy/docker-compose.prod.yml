@@ -1,0 +1,40 @@
+# 设计思路：
+# 生产环境：不挂载源码，用镜像内代码；资源限制；日志轮转
+
+version: "3.9"
+
+services:
+  app:
+    image: llm-agent-server:${VERSION:-latest}
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.prod
+    environment:
+      - ENV=production
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge

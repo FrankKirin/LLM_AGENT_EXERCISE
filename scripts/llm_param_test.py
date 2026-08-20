@@ -5,9 +5,9 @@ from core.logger import logger
 
 # 只设置了base_url和api_key是为什么？
 client = OpenAI(
-    api_key = settings.LLM_API_KEY,
-    base_url = settings.LLM_BASE_URL,
-    timeout = settings.LLM_TIMEOUT
+    api_key = settings.llm_api_key,
+    base_url = settings.llm_base_url,
+    timeout = settings.llm_timeout
 )
 
 prompt = """
@@ -33,7 +33,7 @@ def get_answer_fromllm(question: str):
         messages = [
             {"role": "user","content":rendered_prompt}
         ],
-        model = settings.LLM_MODEL,
+        model = settings.llm_model,
         temperature=0.1
     )
     raw_content = response.choices[0].message.content

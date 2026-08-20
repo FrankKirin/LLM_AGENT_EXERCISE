@@ -5,7 +5,7 @@ from openai import OpenAI
 from core.config import settings
 from core.tools import TOOLS_DEF, TOOLS_MAP
 
-client = OpenAI(base_url=settings.LLM_BASE_URL,api_key=settings.LLM_API_KEY)
+client = OpenAI(base_url=settings.llm_base_url,api_key=settings.llm_api_key)
 
 # 三引号不需要手动加换行符,如果双引号需要手动加换行符
 PROMPT = """
@@ -26,7 +26,7 @@ def simple_fc_run(user_query: str):
     formated_prompt = PROMPT.replace("__TOOLSINFO__", tools_text).replace("__QUERY__", user_query)
     logger.debug(f"处理后的prompt内容: {formated_prompt}")
     chat = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=settings.llm_model,
         # 从来没说过message需要返回json格式的prompt作为content
         messages=[{"role":"user", "content": formated_prompt}],  # loads把字符串转为python对象
         temperature=0.1
@@ -63,7 +63,7 @@ def simple_fc_run(user_query: str):
             """
 
             final = client.chat.completions.create(
-                model=settings.LLM_MODEL,
+                model=settings.llm_model,
                 messages=[{"role":"user", "content": summary_promt}],
                 temperature=0.3
             )

@@ -8,9 +8,9 @@ from core.logger import logger
 
 # 创建ChatOpenAI客户端
 llm = ChatOpenAI(
-    base_url=settings.LLM_BASE_URL,
-    model=settings.LLM_MODEL,
-    api_key=settings.LLM_API_KEY,
+    base_url=settings.llm_base_url,
+    model=settings.llm_model,
+    api_key=settings.llm_api_key,
     temperature=0.1,
 )
 

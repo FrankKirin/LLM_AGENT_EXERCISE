@@ -107,8 +107,6 @@ class MemoryManager:
         response = await llm.ainvoke(input=prompt)
         summary = str(response.content)
 
-        logger.debug(f"The result of session memory from llm: {summary}")
-
         self.medium_term[session_id] = summary
 
         return summary

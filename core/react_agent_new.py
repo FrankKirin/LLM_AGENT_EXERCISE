@@ -9,11 +9,11 @@ from core.logger import logger
 
 # 创建LLM并绑定tools
 llm = ChatOpenAI(
-    base_url = settings.LLM_BASE_URL,
-    model = settings.LLM_MODEL,
-    api_key = settings.LLM_API_KEY,
+    base_url = settings.llm_base_url,
+    model = settings.llm_model,
+    api_key = settings.llm_api_key,
     temperature = 0.1,
-    timeout = settings.LLM_TIMEOUT
+    timeout = settings.llm_timeout
 ).bind_tools(tools)
 
 # 实现ReAct循环 输入用户session_id和用户问题 输出工具调用 拼接会话历史和用户新问题 最多调用3次

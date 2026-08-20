@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 class ChatMemoryManager:
     """
     保存或创建已经有session_id的用户
-    异步保存HumanMessage和AIMessage
+    支持异步保存HumanMessage和AIMessage
     """
     def __init__(self):
         # store字典按照session_id: InMemoryChatMessageHistory

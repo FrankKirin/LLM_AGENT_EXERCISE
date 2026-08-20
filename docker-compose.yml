@@ -1,0 +1,42 @@
+# 设计思路：
+# 本地开发用docker-compose一键启动所有依赖服务
+# 开发环境可以用uv run启动，挂载源码实现热更新
+
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # 开发环境挂载源码，实现热更新
+      - ./core:/app/core
+      - ./api:/app/api
+      - ./chroma_db:/app/chroma_db
+    environment:
+      - ENV=development
+    # 开发环境用uv run启动，带reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - agent-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - agent-network
+    depends_on:
+      - app
+
+networks:
+  agent-network:
+    driver: bridge

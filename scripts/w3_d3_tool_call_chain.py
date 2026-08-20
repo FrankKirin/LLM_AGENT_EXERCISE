@@ -7,11 +7,11 @@ from core.logger import logger
 
 # 创建了llm
 llm = ChatOpenAI(
-    base_url=settings.LLM_BASE_URL,
-    api_key=settings.LLM_API_KEY,
-    model=settings.LLM_MODEL,
+    base_url=settings.llm_base_url,
+    api_key=settings.llm_api_key,
+    model=settings.llm_model,
     temperature=0.3,
-    timeout=settings.LLM_TIMEOUT
+    timeout=settings.llm_timeout
 )
 
 # prompt构建,差点忘记！！！

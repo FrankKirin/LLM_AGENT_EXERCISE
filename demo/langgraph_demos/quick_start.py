@@ -10,11 +10,11 @@ from typing import Literal
 from langgraph.graph import StateGraph, START, END
 
 llm = ChatOpenAI(
-    base_url=settings.LLM_BASE_URL,
-    api_key=settings.LLM_API_KEY,
+    base_url=settings.llm_base_url,
+    api_key=settings.llm_api_key,
     temperature=0.3,
-    model=settings.LLM_MODEL,
-    timeout=settings.LLM_TIMEOUT
+    model=settings.llm_model,
+    timeout=settings.llm_timeout
 )
 
 # tool工具必须写好文档功能描述，"""描述内容"""

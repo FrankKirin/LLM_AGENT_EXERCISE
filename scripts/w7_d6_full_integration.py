@@ -29,10 +29,12 @@ async def full_agentic_rag_with_memory(user_id: str, session_id: str, user_query
     输入：
         user_id, session_id, 用户问题
     处理：
-
+        根据query检索相关记忆，将记忆和用户query拼接成新的query，放入Agentic RAG中运行拿到result
+        agentic_rag的结果作为AI message的短期记忆；query作为human message加入到短期记忆
     输出：
+        Agentic RAG最终返回的结果
     """
-    logger.info(f"用户提问：{user_query}")
+    # logger.info(f"用户提问：{user_query}")
 
     # 检索相关记忆
     logger.info("Step1: 检索相关记忆...")
@@ -63,7 +65,6 @@ async def full_agentic_rag_with_memory(user_id: str, session_id: str, user_query
     }, config = config)
 
     answer = result["final_answer"]
-    logger.info(f"答案生成完成，长度：{len(answer)}")
 
     # 更新短期记忆
     memory_manager.add_to_short_term(session_id, HumanMessage(content=user_query))

@@ -8,10 +8,10 @@ from langchain_core.output_parsers import StrOutputParser
 
 # 定义llm
 llm = ChatOpenAI(
-    base_url=settings.LLM_BASE_URL,
-    api_key = settings.LLM_API_KEY,
-    model = settings.LLM_MODEL,
-    timeout = settings.LLM_TIMEOUT,
+    base_url=settings.llm_base_url,
+    api_key = settings.llm_api_key,
+    model = settings.llm_model,
+    timeout = settings.llm_timeout,
     temperature=0.3
 )
 

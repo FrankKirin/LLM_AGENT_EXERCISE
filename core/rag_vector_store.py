@@ -11,13 +11,15 @@ from langchain_core.documents import Document
 from langchain_classic.retrievers import EnsembleRetriever
 from typing import Literal
 from langchain_core.retrievers import BaseRetriever
+
 from rich import print
+
 
 # 配置好硅基流动的embedding模型
 embedding = OpenAIEmbeddings(
-    base_url=settings.LLM_EMBEDDING_BASE_URL,
-    api_key=settings.LLM_EMBEDDING_API_KEY,
-    model=settings.LLM_EMBEDDING_MODEL
+    base_url=settings.embedding_base_url,
+    api_key=settings.embedding_api_key,
+    model=settings.embedding_model
 )
 
 CHUNK_SIZE = 1000
@@ -41,6 +43,7 @@ def load_txt(file_path: str):
     loader = TextLoader(file_path)
     docs = loader.load()
     return text_splitter.split_documents(docs)
+
 
 # 本地持久化向量库
 CHROMA_DIR = Path(__file__).resolve().parent.parent/"core"/"chroma_db"
@@ -93,8 +96,15 @@ def get_vector_retriever(
 
 def get_bm25_retriever(k:int=4)->BaseRetriever:
     vector_store = get_vector_store()
+    # get方法返回字典
     all_data = vector_store.get(include=["documents", "metadatas"])
-    retriever = BM25Retriever.from_documents(all_data]))
+
+    doc_list = [
+        Document(page_content=page_content, metadata=metadata)
+        for page_content, metadata in zip(all_data['documents'], all_data['metadatas'])
+    ]
+
+    retriever = BM25Retriever.from_documents(doc_list)
     retriever.k = k
 
     return retriever
@@ -146,9 +156,18 @@ def test_hibird_retriever(query, k):
 
 
 if __name__ == "__main__":
-    query = "用户有什么兴趣爱好或者偏好？"
+
+    # init_pdf_file_to_vector('P10上下水套装版说明书.pdf')
+
+    query = "什么是自动上下水功能？"
     # test_mmr_search(query=query)
     # test_bm25_search(query, k=4)
     # test_hibird_retriever(query, k=4)
-    result = get_vector_store()
-    print(result[:3])
+    # result = get_vector_store()
+    # print(result[:3])
+
+    # retriever = get_bm25_retriever()
+    # result = retriever.invoke(query)
+
+    # print(result)
+
