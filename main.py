@@ -33,6 +33,3 @@ async def global_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
-# main函数中创建fastapi应用，注册chat_router这个路由，额外定义全局异常处理来捕获没写的异常
-# 

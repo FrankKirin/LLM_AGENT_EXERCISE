@@ -11,7 +11,6 @@ from langchain_core.documents import Document
 from langchain_classic.retrievers import EnsembleRetriever
 from typing import Literal
 from langchain_core.retrievers import BaseRetriever
-
 from rich import print
 
 
