@@ -145,6 +145,7 @@ dependencies = [
     "rich-toolkit==0.20.3",
     "rignore==0.7.6",
     "rpds-py==2026.6.3",
+    "scipy>=1.17.1",
     "sentry-sdk==2.65.0",
     "shellingham==1.5.4",
     "six==1.17.0",

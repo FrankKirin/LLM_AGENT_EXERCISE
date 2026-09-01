@@ -27,7 +27,7 @@ class APIKeyManager:
 
     def validate_key(self, api_key: str) -> dict | None:
         info = self.api_keys.get(api_key)
-        return info if info and info.get("enable") else None
+        return info if info and info.get("enabled") else None
 
     def check_permission(self, api_key: str, permission: str) -> bool:
         """
@@ -75,7 +75,7 @@ class InputValidator:
         if not text or not text.strip():
             return False, "输入文本不能为空"
         if len(text) > cls.MAX_INPUT_LENGTH:
-            return False, "输入过长,"
+            return False, "输入过长"
         for pattern in cls.SENSITIVE_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
                 log_warning("检测到Prompt注入", preview=text[:50])
@@ -83,7 +83,7 @@ class InputValidator:
         return True, ""
 
     @classmethod
-    def senitize(cls, text: str) -> str:
+    def sanitize(cls, text: str) -> str:
         # sub:查找某个符合正则表达式的内容，然后替换成指定内容
         res = re.sub(
             r'[\x00-\x1f\x7f-\x9f]',
@@ -101,30 +101,32 @@ class OutputFiler:
         "api_key": r"sk-[a-zA-Z0-9]{20,}",
     }
 
-    MAX_DURATION = 300
-
     @classmethod
     def filter_pii(cls, text: str) -> str:
         # 输出中pii信息不做剔除，而是替换
+        # 匹配顺序也很重要，先匹配更长，更具体的敏感信息
         filtered = text
-        filtered = re.sub(cls.PII_PATTERNS["phone"], "1*******000", filtered)
-        filtered = re.sub(cls.PII_PATTERNS["id_card"], "******************", filtered)
-        filtered = re.sub(cls.PII_PATTERNS["email"], "***@***.com", filtered)
         filtered = re.sub(cls.PII_PATTERNS["api_key"], "sk-****", filtered)
+        filtered = re.sub(cls.PII_PATTERNS["id_card"], "******************", filtered)
+        filtered = re.sub(cls.PII_PATTERNS["phone"], "1*******000", filtered)
+        filtered = re.sub(cls.PII_PATTERNS["email"], "***@***.com", filtered)
+        print(f"filtered 内容: {filtered}")
         return filtered
 
-    def verify_request_signature(self, body: str, timestamp: str,
-                                 signature: str, secret: str) -> bool:
-        # 请求签名验证（防篡改+5分钟防重放:攻击者及时把一条请求原样抓下来，也不能无限次重新发送）
-        # timestamp通常在HTTP的Header上，默认要求传文本，所以收到后转int
-        try:
-            ts = int(timestamp)
-            if abs(time.time() - ts) > self.MAX_DURATION:
-                return False
-        except ValueError:
+def verify_request_signature(body: str, timestamp: str,
+                                signature: str, secret: str) -> bool:
+    # 请求签名验证（防篡改+5分钟防重放:攻击者及时把一条请求原样抓下来，也不能无限次重新发送）
+    # timestamp通常在HTTP的Header上，默认要求传文本，所以收到后转int
+    try:
+        ts = int(timestamp)
+        if abs(time.time() - ts) > 300:
             return False
-        # hmac.new(secret, msg, digestmode='sha256')
-        # secret和msg都需要是bytes
-        expected = hmac.new(secret.encode(),
-                            f"{timestamp}:{body}".encode(), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected, signature)
+    except ValueError as e:
+        log_error(f"遇到ValueError: str(e)")
+        return False
+    # hmac.new(secret, msg, digestmode='sha256')
+    # secret和msg都需要是bytes
+    expected = hmac.new(secret.encode(),
+                        f"{timestamp}:{body}".encode(), hashlib.sha256).hexdigest()
+    print(f"expected:{expected}")
+    return hmac.compare_digest(expected, signature)
