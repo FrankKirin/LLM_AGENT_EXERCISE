@@ -10,6 +10,7 @@ from core.llm_client import llm_chat_with_tools
 from api.chat_router import router as agent_router
 from api.agent_router import router as agent_react_router
 from api.multi_agent_router import router as multi_agent_router
+from core.saas_platform.api import router as sass_router
 
 app = FastAPI(title="LLM练习SSE")
 # 注册路由，这是重点
@@ -19,6 +20,7 @@ app.include_router(agent_router)
 app.include_router(rag_router)
 app.include_router(agent_react_router)
 app.include_router(multi_agent_router)
+app.include_router(sass_router)
 load_dotenv()
 
 # 全局异常处理器

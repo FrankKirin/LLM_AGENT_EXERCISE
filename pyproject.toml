@@ -11,6 +11,7 @@ dependencies = [
     "aiohappyeyeballs==2.7.1",
     "aiohttp==3.14.2",
     "aiosignal==1.4.0",
+    "aiosqlite>=0.22.1",
     "annotated-doc==0.0.4",
     "annotated-types==0.7.0",
     "anyio==4.14.2",
@@ -78,6 +79,7 @@ dependencies = [
     "langchain-text-splitters==1.1.2",
     "langgraph==1.2.9",
     "langgraph-checkpoint==4.1.1",
+    "langgraph-checkpoint-postgres>=3.1.2",
     "langgraph-prebuilt==1.1.0",
     "langgraph-sdk==0.4.2",
     "langsmith==0.10.9",
@@ -136,6 +138,7 @@ dependencies = [
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
     "rank-bm25>=0.2.2",
+    "redis>=8.1.0",
     "referencing==0.37.0",
     "regex==2026.7.19",
     "requests==2.34.2",
@@ -145,6 +148,7 @@ dependencies = [
     "rich-toolkit==0.20.3",
     "rignore==0.7.6",
     "rpds-py==2026.6.3",
+    "ruff>=0.16.5",
     "scipy>=1.17.1",
     "sentry-sdk==2.65.0",
     "shellingham==1.5.4",
@@ -184,3 +188,12 @@ llm-agent-exercise = "llm_agent_exercise:main"
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+]
