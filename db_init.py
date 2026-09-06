@@ -1,6 +1,7 @@
 import asyncio
 from core.saas_platform.db.base import Base
-from core.saas_platform.db.models import Tenant, AgentConversation, TenantAgentConfig, TokenUsageLog
+from core.saas_platform.models.tenant import Tenant, AgentConversation, TenantAgentConfig, TokenUsageLog
+from core.saas_platform.models.plugin import AgentPlugin, TenantPluginRel, TenantTool
 from core.saas_platform.db.session import async_engine
 from core.structured_logger import log_info
 

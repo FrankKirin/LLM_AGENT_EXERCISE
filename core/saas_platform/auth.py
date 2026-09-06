@@ -2,7 +2,7 @@ import asyncio
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.saas_platform.db.session import AsyncSessionLocal
-from core.saas_platform.db.models import Tenant, TokenUsageLog
+from core.saas_platform.models.tenant import Tenant, TokenUsageLog
 from uuid import UUID
 from sqlalchemy import select, func
 from datetime import datetime

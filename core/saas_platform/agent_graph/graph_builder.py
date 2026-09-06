@@ -7,9 +7,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from langgraph.graph import StateGraph, MessagesState
-from core.saas_platform.models.plugin import AgentPlugin, TenantPluginRel, CustomTool
+from core.saas_platform.models.plugin import AgentPlugin, TenantPluginRel, TenantTool
 from core.saas_platform.plugins.plugin_loader import instantiate_plugin
-
 
 async def build_tenant_graph(tenant_id:str, db:AsyncSession):
     graph_builder = StateGraph(MessagesState)
@@ -32,8 +31,8 @@ async def build_tenant_graph(tenant_id:str, db:AsyncSession):
 
     # # 2.加载租户自定义工具(绑定给supervisor)
     # tool_query = await db.execute(
-    #     select(CustomTool.description, CustomTool.description, 
-    #            CustomTool.param_schema, CustomTool.runnable_code)
-    #            .where(CustomTool.tenant_id == tenant_id)
+    #     select(TenantTool.description, TenantTool.description, 
+    #            TenantTool.param_schema, TenantTool.runnable_code)
+    #            .where(TenantTool.tenant_id == tenant_id)
     # )
     # tool_rows = tool_query.all()

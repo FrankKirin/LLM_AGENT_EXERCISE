@@ -33,7 +33,7 @@ class TenantPluginRel(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     __table_args__ = (UniqueConstraint("tenant_id", "plugin_id", name="uniq_tenant_plugin"),)
 
-class CustomTool(Base):
+class TenantTool(Base):
     # 租户自己定义的Agent Tool
     __tablename__ = "tenant_tool"
     id:Mapped[int] = mapped_column(primary_key=True)

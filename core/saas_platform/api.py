@@ -3,11 +3,11 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Depends, HTTPException, status
 from core.saas_platform.auth import verify_tenant, check_token_quota
 from core.saas_platform.db.session import get_db
-from core.saas_platform.db.models import TenantAgentConfig, TokenUsageLog
+from core.saas_platform.models.tenant import TenantAgentConfig, TokenUsageLog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi.responses import StreamingResponse
-from core.saas_platform.db.models import Tenant
+from core.saas_platform.models.tenant import Tenant
 from core.saas_platform.graph.agent_graph import build_agent_with_tenant_config 
 from core.structured_logger import log_info
 

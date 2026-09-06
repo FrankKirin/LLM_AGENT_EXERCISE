@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 from langgraph.graph import START, END, StateGraph
 from langchain_openai import ChatOpenAI
-from core.saas_platform.db.models import TenantAgentConfig
+from core.saas_platform.models.tenant import TenantAgentConfig
 from core.config import settings
 from core.saas_platform.db.session import AsyncSessionLocal 
-from core.saas_platform.db.models import Tenant, TenantAgentConfig, TokenUsageLog
+from core.saas_platform.models.tenant import Tenant, TenantAgentConfig, TokenUsageLog
 from sqlalchemy import select
 
 class AgentState(BaseModel):
@@ -57,5 +57,6 @@ async def add_tenant_and_config_to_table():
         await db.commit()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(add_tenant_and_config_to_table())
+    # import asyncio
+    # asyncio.run(test_llm())
+    test_llm()

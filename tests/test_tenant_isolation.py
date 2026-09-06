@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy import select
-from core.saas_platform.models.tenant import Tenant
+from core.saas_platform.models.tenant.tenant import Tenant
 from core.saas_platform.db.session import get_db
 
 @pytest.mark.asyncio

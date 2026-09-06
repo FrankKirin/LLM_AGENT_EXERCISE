@@ -1,16 +1,9 @@
 import asyncio
-
 from core.saas_platform.db.session import AsyncSessionLocal
+from core.saas_platform.models.tenant import (Tenant, TenantAgentConfig, AgentConversation, TokenUsageLog)
+from core.saas_platform.models.plugin import (AgentPlugin, TenantPluginRel, TenantTool)
 
-
-from core.saas_platform.db.models import (
-    Tenant,
-    TenantAgentConfig,
-    AgentConversation,
-    TokenUsageLog,
-)
-
-async def init_data():
+async def tenant_init_data():
     async with AsyncSessionLocal() as db:
 
         tenant = Tenant(
@@ -27,7 +20,7 @@ async def init_data():
         agent_config = TenantAgentConfig(
             tenant_id=tenant.id,
             system_prompt="你是一个专业的海运报价助手",
-            model_name="deepseek_v4_flash",
+            model_name="deepseek-ai/DeepSeek-V3.2",
             temperature=0.2,
         )
         db.add(agent_config)
@@ -57,6 +50,7 @@ async def init_data():
         print("测试数据写入成功")
         print("tenant_id", tenant.id)
 
+
 if __name__ == "__main__":
-    asyncio.run(init_data())
+    asyncio.run(tenant_init_data())
 
