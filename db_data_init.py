@@ -1,4 +1,5 @@
 import asyncio
+from sqlalchemy import select
 from core.saas_platform.db.session import AsyncSessionLocal
 from core.saas_platform.models.tenant import (Tenant, TenantAgentConfig, AgentConversation, TokenUsageLog)
 from core.saas_platform.models.plugin import (AgentPlugin, TenantPluginRel, TenantTool)
@@ -50,7 +51,16 @@ async def tenant_init_data():
         print("测试数据写入成功")
         print("tenant_id", tenant.id)
 
+async def init_agentplugin():
+    async with AsyncSessionLocal() as db:
+        pass
+        
+
+async def init_db_data():
+    async with AsyncSessionLocal() as db:
+        results = await db.execute(select(Tenant.id))
+        print(results.all()[0])
 
 if __name__ == "__main__":
-    asyncio.run(tenant_init_data())
+    asyncio.run(init_db_data())
 
