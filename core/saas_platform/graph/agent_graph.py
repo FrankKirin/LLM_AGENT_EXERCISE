@@ -45,17 +45,6 @@ def test_llm():
     res = llm.invoke(["user", "你是什么模型？"])
     print(res.content)
 
-async def add_tenant_and_config_to_table():
-    async_session = AsyncSessionLocal()
-    async with async_session as db:
-        tenant = Tenant(
-            tenant_name="Geely",
-            monthly_token_quota=1_000_000,
-            is_active=True
-        )
-        db.add(tenant)
-        await db.commit()
-
 if __name__ == "__main__":
     # import asyncio
     # asyncio.run(test_llm())

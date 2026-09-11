@@ -92,9 +92,9 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 # # Langchain底层只去os.environ里查信息
-# os.environ["LANGSMITH_TRACING"] = settings.LANGSMITH_TRACING
-# os.environ["LANGSMITH_API_KEY"] = settings.LANGSMITH_API_KEY
-# os.environ["LANGSMITH_PROJECT"] = settings.LANGSMITH_PROJECT
+os.environ["LANGSMITH_TRACING"] = str(settings.langsmith_tracing)
+os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
+os.environ["LANGSMITH_PROJECT"] = settings.langsmith_project
 
 """
 快速失败（Fail Fast）：与其等到调用 llm.invoke() 时收到 DeepSeek/OpenAI 返回的 401 Unauthorized 报错（日志难查），

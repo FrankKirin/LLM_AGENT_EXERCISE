@@ -1,9 +1,8 @@
 from core.saas_platform.db.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import (ForeignKey, JSON, Boolean, 
-                        String, DateTime, UniqueConstraint,func)
+from sqlalchemy import (ForeignKey, JSON, Boolean, Text,
+                        String, DateTime, UniqueConstraint, func)
 from typing import Any
-from dataclasses import field
 from datetime import datetime, timezone
 
 class AgentPlugin(Base):
@@ -36,12 +35,12 @@ class TenantPluginRel(Base):
 class TenantTool(Base):
     # 租户自己定义的Agent Tool
     __tablename__ = "tenant_tool"
-    id:Mapped[int] = mapped_column(primary_key=True)
+    id:Mapped[int] = mapped_column(primary_key=True, init=False)
     tenant_id:Mapped[str] = mapped_column(String(64), index=True)
     tool_name:Mapped[str] = mapped_column(String(128))
     description: Mapped[str] = mapped_column(String(512))
     param_schema: Mapped[dict[str, Any]] = mapped_column(JSON)  # 定义tool接收什么参数，参数是什么类型
-    runnable_code:Mapped[str] = mapped_column(JSON, comment="工具执行代码字符串") # 租户自定义tool的执行逻辑用代码字符串形式保存
+    runnable_code:Mapped[str] = mapped_column(Text, comment="工具执行代码字符串") # 租户自定义tool的执行逻辑用代码字符串形式保存
     enabled:Mapped[bool] = mapped_column(Boolean, default=True)
     created_at:Mapped[datetime]= mapped_column(DateTime(timezone=True),
                                                default_factory=lambda: datetime.now(timezone.utc),

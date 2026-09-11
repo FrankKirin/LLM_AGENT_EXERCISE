@@ -11,8 +11,8 @@ def load_pulgin_class(entry_cls_path: str) -> Type[BaseAgentPlugin]:
     try:
         # 加载模块，从模块中找指定类
         module_path, cls_name = entry_cls_path.rsplit(":", maxsplit=1)
-        module = importlib.import_module(module_path)
-        plugin_cls: Type[BaseAgentPlugin] = getattr(module, cls_name)
+        module = importlib.import_module(module_path.strip())
+        plugin_cls: Type[BaseAgentPlugin] = getattr(module, cls_name.strip())
 
         if not issubclass(plugin_cls, BaseAgentPlugin):
             raise TypeError("Plugin class must inherit BaseAgentPlugin")
