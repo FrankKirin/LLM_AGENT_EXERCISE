@@ -1,28 +1,36 @@
-import json
+import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)  # 刷新后台缓存变量
+import json
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated
 from langchain_openai import ChatOpenAI
-from core.config import settings
-from sqlalchemy import select
-from core.saas_platform.models.tenant import Tenant
-from langchain.messages import SystemMessage, AIMessage, HumanMessage, AnyMessage
+from langchain.messages import SystemMessage, HumanMessage
 from langgraph.graph.message import add_messages
-from langgraph.types import Command
 from langchain_core.tools import StructuredTool, tool
-from core.lc_baseline import llm
-from langchain.agents import create_agent
-from core.config import settings # 为什么这句代码没什么作用
-from common_tools.deal_llm_response import clean_json
+# from langchain.agents import create_agent
+from core.config import settings # 为什么这句代码没有让langsmith配置生效
+# from common_tools.deal_llm_response import clean_json
+from langchain_core.tracers.langchain import wait_for_all_tracers
+import os
+print("LANGSMITH_API_KEY 已配置:", "LANGSMITH_API_KEY" in os.environ)
+print("LANGSMITH_TRACING:", os.environ.get("LANGSMITH_TRACING"))
+print("LANGSMITH_PROJECT:", os.environ.get("LANGSMITH_PROJECT", "default"))
 
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     next_step: str # 调度节点用来标记下一步派给谁
     analysis_result: str
-    reporter_result: str
     user_query: str
+    recent_res: str
     reason: str
+
+llm = ChatOpenAI(
+    model=settings.llm_model,
+    base_url=settings.llm_base_url,
+    api_key=settings.llm_api_key,
+    temperature=0.3
+)
 
 def build_supervisor_node(worker_names: list[str], tenant_tools: list[StructuredTool]):
     llm = ChatOpenAI(
@@ -69,31 +77,30 @@ def build_supervisor_node(worker_names: list[str], tenant_tools: list[Structured
 
 # Mocked Worker
 def analysis_worker(state: AgentState):
-    prompt = """你是一个资深的分析师，能够通过全面，深入的思考，分析用户问题，综合最新分析结果和最新报告内容，
-    给出进一步的分析结果
+    prompt = """你是一个资深的分析师，能够通过对用户问题、最新回答、答案不满意的原因进行
+    全面，深入的思考，分析用户问题，罗列出撰写报告的提纲
 
     用户问题：{state['user_query']}
-
-    最新分析结果: {state['analysis_result']}
-    最新报告内容: {state['report_result']}
+    最新回答：{state['recent_res']}
+    答案不满意的原因: {state['reason']}
 """
     messages = [
         SystemMessage(content=prompt),
         HumanMessage(content=state['user_query'])
     ]
+
     res = llm.invoke(messages)
     return {
         "analysis_result": res.content
     }
 
 def report_worker(state: AgentState):
-    prompt = """你是一个擅长总结和写报告的助手，能够根据用户问题，最新分析结果，最新报告内容来完善最终的报告内容,
-    输出一份更新的报告内容
+    prompt = """你是一个擅长总结和写报告的助手，能够根据用户问题，分析的提纲和框架，答案不满意的原因，
+    给出一份符合分析提纲和框架，紧扣用户问题，思路清晰的报告
 
     用户问题：{state['user_query']}
-
-    最新分析结果: {state['analysis_result']}
-    最新报告内容: {state['reporter_result']}
+    分析提纲和框架: {state['analysis_result']}
+    答案不满意的原因：{state['reason']}
 """
     messages = [
         SystemMessage(content=prompt),
@@ -101,7 +108,7 @@ def report_worker(state: AgentState):
     ]
     res = llm.invoke(messages)
     return {
-        "reporter_result": res.content
+        "recent_res": res.content
     }
 
 # 方法1
@@ -121,21 +128,19 @@ def supervisor_node(state:AgentState):
     sys_prompt = f"""你是一个智能调度器，负责根据用户需求决定下一步操作。
     可选项：
         -"analysis": 需要对用户问题进行深度分析(需要提取信息、计算或评估时)
-        -"report": 已经拥有分析结果，需要生成最终报告
-        -"FINISH": 任务已完全满足用户需求，无需进一步操作
+        -"FINISH": 已完全满足用户需求，无需进一步操作
     
         请基于当前对话和已有信息做出决策:
-        -需要进一步，分析，就转去analysis节点，返回字段next_step赋值analysis
-        -如果只是整理成报告，就转去report节点，返回字段next_step赋值report
-        -如果资料足够，就结束，返回字段next_step赋值FINISH
+        -如果问题不难，直接给出回答, 返回字段answer，并把答案保存在answer里
+        -需要进一步分析或者当前问题答案你觉得不足以准确，清晰回答用户问题，就转去analysis节点，返回字段next_step赋值analysis
+        -如果资料足够对问题给出答案，就结束，返回字段next_step赋值FINISH
         用户问题：{state['user_query']}
-        analysis内容：{state['analysis_result']}
-        report内容：{state['reporter_result']}
+        当前问题答案：{state['recent_res']}
 
-        基于每次评估的analysis内容和report内容，给出本次report内容没有达到或者达到预期的理由, 保存到返回的字段reason中
+        基于问题答案内容，给出本次report内容没有达到或者达到预期的理由, 保存到返回的字段reason中
 
-        输出可选项: 'analysis' | 'report' | 'FINISH'
-        用JSON格式输出，格式为{{"next_step":"analysis", "reason":"本次报告内容缺少理论依据"}}
+        输出可选项: 'analysis' | 'FINISH'
+        必须用JSON格式输出，格式为{{"answer": "这个问题的答案就是这样", "next_step":"analysis", "reason":"本次报告内容缺少理论依据"}}
     """
     messages = [
         SystemMessage(content=sys_prompt),
@@ -165,18 +170,22 @@ def supervisor_node(state:AgentState):
             )
 
         next_step = content.get("next_step")
-        if next_step not in ("analysis_worker","report_worker","FINISH"):
+        if next_step not in ("analysis","FINISH"):
             raise ValueError(f"非法next: {next_step}")
 
         reason = content.get("reason")
+        print("="*50)
+        answer = content.get("answer")
+        print(f"supervisor节点答案：{answer}, 模型给的理由: {reason}")
         return {
             "next_step": next_step,
-            "reason": reason
+            "reason": reason,
+            "recent_res": answer,
         }
 
     except Exception as e:
         # 第一层解决：网络错误、API错误、超时、服务端错误
-        print(f"捕获到异常，具体内容为：str(e)")
+        print(f"捕获到异常，具体内容为：{str(e)}")
         return {
             "next_step": "FINISH"
         }
@@ -193,11 +202,10 @@ def build_graph():
         lambda s: s["next_step"],
         {
             "analysis":"analysis_worker",
-            "report":"report_worker",
             "FINISH": END}
         )
 
-    graph.add_edge("analysis_worker", "supervisor")
+    graph.add_edge("analysis_worker", "report_worker")
     graph.add_edge("report_worker", "supervisor")
 
     comp_graph = graph.compile()
@@ -206,15 +214,20 @@ def build_graph():
     return comp_graph
 
 if __name__ == "__main__":
-    # graph = build_graph()
-    # query = "给我一份有关AI Agent的发展报告，不超过500字"
-    # res = graph.invoke({
-    #     "messages": [query],
-    #     "next_step": "",
-    #     "analysis_result": "",
-    #     "reporter_result": "",
-    #     "user_query": query,
-    #     "reason":""
-    # })
+    graph = build_graph()
+    query1 = "你是什么模型?"
+    query2 = "给我介绍一下MCP和Skills的概念，以及说明一下这两个是怎么成为Agent标准的?"
 
-    # print(f"最终结果:{res['reporter_result']}")
+    try:
+        res = graph.invoke({
+            "messages": [],
+            "next_step": "",
+            "analysis_result": "",
+            "user_query": query1,
+            "reason":"",
+            "recent_res":""
+        })
+
+        print(f"最终结果:{res['recent_res']}")
+    finally:
+        wait_for_all_tracers()
