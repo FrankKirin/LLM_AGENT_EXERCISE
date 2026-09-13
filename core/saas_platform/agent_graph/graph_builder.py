@@ -54,7 +54,7 @@ async def build_tenant_graph(tenant_id:str, db:AsyncSession):
 
 async def main_func():
     async with AsyncSessionLocal() as db:
-        graph = await build_tenant_graph("bc1e01f0-7e99-4db8-8980-9904db53ed95", db)
+        graph = await build_tenant_graph("bc7ddf790000485cafe0cd633a1d3f02", db)
         
 
 if __name__ == "__main__":

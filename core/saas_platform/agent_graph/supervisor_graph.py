@@ -114,7 +114,7 @@ def report_worker(state: AgentState):
 # 方法1
 def fetch_weather(location:str="Beijing"):
     """
-        查询城市天气，用户输入城市
+        查询城市天气，用户输入城市，注意：不支持实时天气的查询
         Args:
             localtion: 城市名称，如Beijing，Shanghai
     """
@@ -123,7 +123,6 @@ def fetch_weather(location:str="Beijing"):
         return info[location]
 
 def supervisor_node(state:AgentState):
-
     # 必须是f-string形式
     sys_prompt = f"""你是一个智能调度器，负责根据用户需求决定下一步操作。
     可选项：

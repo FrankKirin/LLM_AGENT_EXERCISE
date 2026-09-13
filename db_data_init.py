@@ -54,7 +54,7 @@ async def tenant_init_data():
         print("tenant数据写入成功")
         print("tenant_id", tenant.id)
 
-async def init_token_usage(tenant_id:UUID=UUID("bc1e01f0-7e99-4db8-8980-9904db53ed95")):
+async def init_token_usage(tenant_id:UUID=UUID("bc7ddf790000485cafe0cd633a1d3f02")):
     async with AsyncSessionLocal() as db:
         token_use = TokenUsageLog(
             tenant_id=tenant_id,
@@ -66,19 +66,34 @@ async def init_token_usage(tenant_id:UUID=UUID("bc1e01f0-7e99-4db8-8980-9904db53
         await db.commit()
         print(f"Token使用记录添加成功：{token_use}")
 
-
 async def init_agentplugin():
     async with AsyncSessionLocal() as db:
-        agentplugin = AgentPlugin(
+        await db.execute(delete(AgentPlugin))
+        await db.commit()
+
+        weather = AgentPlugin(
             plugin_key="weather",
             plugin_name="get_weather",
-            entry_cls="core.saas_platform.plugins",
+            entry_cls="core.saas_platform.tools.fetch_weather:FetchWeather",
             config_schema={"location":"Shanghai"},
             is_public=True,
         )
-        db.add(agentplugin)
+        db.add(weather)
         await db.commit()
-        print("agent plugin数据写入成功")
+        print(f"plugin插件数据写入成功:{weather}, weather_id: {weather.id}")
+
+        query_storage = AgentPlugin(
+            plugin_key="storage",
+            plugin_name="fetch_storage_info",
+            entry_cls="core.saas_platform.tools.api_usage:ApiUsage",
+            config_schema={"tenant_id":""},
+            is_public=False
+        )
+        db.add(query_storage)
+        await db.commit()
+
+        print(f"plugin插件数据写入成功:{query_storage}, storate_id: {query_storage.id}")
+
 
 async def init_tenantpluginrel():
     async with AsyncSessionLocal() as db:
@@ -104,7 +119,7 @@ async def init_tenanttool():
         tenant_id = await db.scalars(select(Tenant.id))
         selected_tenant_id = random.choice(list(tenant_id))
 
-        tenant_tool = TenantTool(
+        tenant_tool1 = TenantTool(
             tenant_id=str(selected_tenant_id),
             tool_name="calculate_add",
             description="计算两个整数的和",
@@ -113,13 +128,28 @@ async def init_tenanttool():
                             return a+b""",
             enabled=True, 
         )
-        db.add(tenant_tool)
+        tenant_tool2 = TenantTool(
+            tenant_id=str(selected_tenant_id),
+            tool_name="fetch_storage_info",
+            description="获取用户剩余可用云盘空间",
+            param_schema={},
+            runnable_code="""
+                async def tool_call(tenant_id:UUID)->int:
+                    async with AsyncSessionLocal() as db:
+                        rows = await db.execute(select(StorageInfo)
+                                                .where(StorageInfo.tenant_id == tenant_id))
+                        res = rows.scalar_one_or_none()
+                        return res.remaining_space if res else 0
+                """,
+            enabled=True, 
+        )
+        tenant_tools = [tenant_tool1, tenant_tool2]
+
+        db.add_all(tenant_tools)
         await db.commit()
 
 async def init_storage_info():
     async with AsyncSessionLocal() as db:
-
-        
         tenant_ids = await db.scalars(select(Tenant.id))    # 返回一个迭代器
         for tenant_id in tenant_ids:
             storage = StorageInfo(
@@ -130,7 +160,6 @@ async def init_storage_info():
             await db.commit()
             await db.flush()
             print(f"新建storage_info对象成功: {storage}")
-        
 
 # drop table
 async def drop_tenant_tool():
@@ -141,7 +170,7 @@ async def drop_tenant_tool():
 
 async def drop_storage_info():
     async with AsyncSessionLocal() as db:
-        stmt = await db.execute(delete(StorageInfo))
+        await db.execute(delete(StorageInfo))
         await db.commit()
         print(f"storage_info表内容已清空")
 
@@ -149,11 +178,18 @@ if __name__ == "__main__":
 
     # asyncio.run(drop_tenant_tool())
 
-    # operate storage_info
+    ### operate storage_info
     # asyncio.run(init_storage_info())
     # asyncio.run(drop_storage_info())
 
 
-    # operate token_usage_log
-    asyncio.run(init_token_usage())
+    ### operate token_usage_log
+    # asyncio.run(init_token_usage())
+
+    ### init_agent_plugin
+    # asyncio.run(init_agentplugin())
+
+    ### init_agent_tools
+    asyncio.run(init_tenanttool())
+
 

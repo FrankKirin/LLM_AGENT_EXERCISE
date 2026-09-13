@@ -13,7 +13,7 @@ class QueryStorageInput(BaseModel):
 
 async def query_token_usage(tenant_id:UUID):
     async with AsyncSessionLocal() as db:
-        records = await db.execute(select(StorageInfo).where(StorageInfo.tenant_id==tenant_id))
+        records = await db.execute(select(TokenUsageLog).where(TokenUsageLog.tenant_id==tenant_id))
         res = records.scalar_one_or_none()
         if not res:
             return {"error": "storage record not found"}
