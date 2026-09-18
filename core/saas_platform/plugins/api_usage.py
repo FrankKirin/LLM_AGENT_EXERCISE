@@ -55,8 +55,6 @@ class ApiUsage(BaseAgentPlugin):
         graph.add_edge("token_usage", END)
 
         compiled_graph = graph.compile()
-        print("\n Api usage worker's mermaid graph\n")
-        print(compiled_graph.get_graph().draw_mermaid())
 
         return "api_usage", compiled_graph
 

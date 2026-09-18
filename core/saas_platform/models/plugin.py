@@ -1,9 +1,10 @@
 from core.saas_platform.db.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import (ForeignKey, JSON, Boolean, Text,
-                        String, DateTime, UniqueConstraint, func)
+                        String, DateTime, UniqueConstraint, func, Uuid)
 from typing import Any
 from datetime import datetime, timezone
+from uuid import UUID
 
 class AgentPlugin(Base):
     __tablename__ = "agent_plugin"
@@ -24,8 +25,9 @@ class AgentPlugin(Base):
 
 class TenantPluginRel(Base):
     __tablename__ = "tenant_plugin_rel"
+    # 左边数据库列名，右边是映射到sqlalchemy的类型
     id:Mapped[int] = mapped_column(primary_key=True, init=False)
-    tenant_id:Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id:Mapped[UUID] = mapped_column(Uuid, index=True)
     plugin_id:Mapped[int] = mapped_column(ForeignKey("agent_plugin.id"))
     # 这个租户实际配置成什么
     plugin_config: Mapped[dict[str, Any]] = mapped_column(JSON, default_factory=dict)
@@ -36,7 +38,7 @@ class TenantTool(Base):
     # 租户自己定义的Agent Tool
     __tablename__ = "tenant_tool"
     id:Mapped[int] = mapped_column(primary_key=True, init=False)
-    tenant_id:Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id:Mapped[UUID] = mapped_column(Uuid, index=True)
     tool_name:Mapped[str] = mapped_column(String(128))
     description: Mapped[str] = mapped_column(String(512))
     param_schema: Mapped[dict[str, Any]] = mapped_column(JSON)  # 定义tool接收什么参数，参数是什么类型

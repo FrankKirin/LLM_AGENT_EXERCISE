@@ -6,6 +6,7 @@ from core.saas_platform.models.storage import StorageInfo
 from core.saas_platform.models.tenant import (Tenant, TenantAgentConfig, AgentConversation, TokenUsageLog)
 from core.saas_platform.models.plugin import (AgentPlugin, TenantPluginRel, TenantTool)
 from uuid import UUID
+import textwrap
 
 # Init Table data
 async def tenant_init_data():
@@ -54,7 +55,7 @@ async def tenant_init_data():
         print("tenant数据写入成功")
         print("tenant_id", tenant.id)
 
-async def init_token_usage(tenant_id:UUID=UUID("bc7ddf790000485cafe0cd633a1d3f02")):
+async def init_token_usage(tenant_id:UUID):
     async with AsyncSessionLocal() as db:
         token_use = TokenUsageLog(
             tenant_id=tenant_id,
@@ -74,7 +75,7 @@ async def init_agentplugin():
         weather = AgentPlugin(
             plugin_key="weather",
             plugin_name="get_weather",
-            entry_cls="core.saas_platform.tools.fetch_weather:FetchWeather",
+            entry_cls="core.saas_platform.plugins.fetch_weather:FetchWeather",
             config_schema={"location":"Shanghai"},
             is_public=True,
         )
@@ -83,9 +84,9 @@ async def init_agentplugin():
         print(f"plugin插件数据写入成功:{weather}, weather_id: {weather.id}")
 
         query_storage = AgentPlugin(
-            plugin_key="storage",
+            plugin_key="api_usage",
             plugin_name="fetch_storage_info",
-            entry_cls="core.saas_platform.tools.api_usage:ApiUsage",
+            entry_cls="core.saas_platform.plugins.api_usage:ApiUsage",
             config_schema={"tenant_id":""},
             is_public=False
         )
@@ -95,52 +96,68 @@ async def init_agentplugin():
         print(f"plugin插件数据写入成功:{query_storage}, storate_id: {query_storage.id}")
 
 
-async def init_tenantpluginrel():
+async def init_tenantpluginrel(tenant_id:UUID):
     async with AsyncSessionLocal() as db:
-        tenant_id = await db.scalars(select(Tenant.id))
-        agentplugin_id = await db.scalars(select(AgentPlugin.id))
+        await db.execute(delete(TenantPluginRel))
+        await db.commit()
+        # tenant_id = await db.scalars(select(Tenant.id))
+        # tenant_id = tenant_id
+        # agentplugin_id = await db.scalars(select(AgentPlugin.id))
 
-        selected_tenant_id = random.choice(list(tenant_id))
-        selected_agentplugin_id = random.choice(list(agentplugin_id))
+        # selected_tenant_id = random.choice(list(tenant_id))
+        selected_tenant_id = tenant_id
+        # selected_agentplugin_id = random.choice(list(agentplugin_id))
+        selected_agentplugin_id = 2
 
-        rel = TenantPluginRel(
-            tenant_id=str(selected_tenant_id),
-            plugin_id=selected_agentplugin_id,
+        rel1 = TenantPluginRel(
+            tenant_id=selected_tenant_id,
+            plugin_id=1,
             plugin_config={"default_location":"Beijing"},
             enabled=True,
         )
-        db.add(rel)
+        rel2 = TenantPluginRel(
+            tenant_id=selected_tenant_id,
+            plugin_id=selected_agentplugin_id,
+            plugin_config={},
+            enabled=True,
+        )
+        db.add_all([rel1, rel2])
         await db.commit()
 
         print("agent_plugin_rel写入成功")
 
-async def init_tenanttool():
+async def init_tenanttool(tenant_id:UUID):
     async with AsyncSessionLocal() as db:
-        tenant_id = await db.scalars(select(Tenant.id))
-        selected_tenant_id = random.choice(list(tenant_id))
+        # tenant_id = await db.scalars(select(Tenant.id))
+        # selected_tenant_id = random.choice(list(tenant_id))
+        selected_tenant_id = tenant_id
+        await db.execute(delete(TenantTool))
+        await db.commit()
 
         tenant_tool1 = TenantTool(
-            tenant_id=str(selected_tenant_id),
+            tenant_id=selected_tenant_id,
             tool_name="calculate_add",
             description="计算两个整数的和",
             param_schema={"a":"int", "b":"int"},
-            runnable_code="""def tool_func(a:int, b:int):
-                            return a+b""",
+            runnable_code=textwrap.dedent("""def tool_func(a:int, b:int):
+                            return a+b""").strip(),
             enabled=True, 
         )
-        tenant_tool2 = TenantTool(
-            tenant_id=str(selected_tenant_id),
-            tool_name="fetch_storage_info",
-            description="获取用户剩余可用云盘空间",
-            param_schema={},
-            runnable_code="""
-                async def tool_call(tenant_id:UUID)->int:
+        run_code ="""
+                from uuid import UUID
+                async def tool_func(tenant_id:UUID)->int:
                     async with AsyncSessionLocal() as db:
                         rows = await db.execute(select(StorageInfo)
                                                 .where(StorageInfo.tenant_id == tenant_id))
                         res = rows.scalar_one_or_none()
                         return res.remaining_space if res else 0
-                """,
+                """
+        tenant_tool2 = TenantTool(
+            tenant_id=selected_tenant_id,
+            tool_name="fetch_storage_info",
+            description="获取用户剩余可用云盘空间",
+            param_schema={"tenant_id":"UUID"},
+            runnable_code=textwrap.dedent(run_code).strip(),
             enabled=True, 
         )
         tenant_tools = [tenant_tool1, tenant_tool2]
@@ -176,20 +193,21 @@ async def drop_storage_info():
 
 if __name__ == "__main__":
 
+    user_id = UUID("b7c84a42f0e941d29943d4f5e6f0f9da")
     # asyncio.run(drop_tenant_tool())
 
     ### operate storage_info
     # asyncio.run(init_storage_info())
     # asyncio.run(drop_storage_info())
 
-
     ### operate token_usage_log
-    # asyncio.run(init_token_usage())
+    # asyncio.run(init_token_usage(user_id))
 
     ### init_agent_plugin
     # asyncio.run(init_agentplugin())
 
+    ## init_tenant_plugin_rel
+    # asyncio.run(init_tenantpluginrel(user_id))
+
     ### init_agent_tools
-    asyncio.run(init_tenanttool())
-
-
+    asyncio.run(init_tenanttool(user_id))

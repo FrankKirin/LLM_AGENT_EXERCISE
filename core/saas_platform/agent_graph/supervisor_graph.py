@@ -8,14 +8,9 @@ from langchain_openai import ChatOpenAI
 from langchain.messages import SystemMessage, HumanMessage
 from langgraph.graph.message import add_messages
 from langchain_core.tools import StructuredTool, tool
-# from langchain.agents import create_agent
 from core.config import settings # 为什么这句代码没有让langsmith配置生效
-# from common_tools.deal_llm_response import clean_json
 from langchain_core.tracers.langchain import wait_for_all_tracers
 import os
-print("LANGSMITH_API_KEY 已配置:", "LANGSMITH_API_KEY" in os.environ)
-print("LANGSMITH_TRACING:", os.environ.get("LANGSMITH_TRACING"))
-print("LANGSMITH_PROJECT:", os.environ.get("LANGSMITH_PROJECT", "default"))
 
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
