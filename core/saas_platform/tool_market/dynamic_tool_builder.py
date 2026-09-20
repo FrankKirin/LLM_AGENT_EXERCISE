@@ -23,9 +23,9 @@ class ToolContext:
     user_id: str | None
     session_id: str | None
 
-def build_dynamic_tool(tool_name:str, description: str,
-                       run_code:str, param_schema:type,
-                       system_context:dict)->StructuredTool:
+async def build_dynamic_tool(tool_name:str, description: str,
+                       run_code:str, param_schema:dict,
+                       system_context:dict={})->StructuredTool:
     """
         param_schema: 标准JSON Schema
         system_context: 系统注入参数，不暴露给LLM
@@ -115,17 +115,21 @@ if __name__ == "__main__":
             "type": "string",
             "description": "城市名称，只支持Shanghai、Beijing"
         },
-        "days": {
-            "type": "integer",
-            "description": "查询未来几天，范围 1~7"
-        }
     },
-    "required": ["city", "days"]
+    "required": ["city"]
 }
     run_code = """
-
+    def tool_func(city:str="Shanghai"):
+        data = {"Shanghai": "34C", "Beijing": "28C"}
+        res = data.get(city)
+        return res if res else "你所查询的城市天气数据不存在"
     """
+    import asyncio
+    tool = asyncio.run(build_dynamic_tool("fetch_weather", "工具根据城市返回实时气温",
+                       run_code=run_code, param_schema=mock_sync_param_schema))
 
-    build_dynamic_tool(mock_sync_param_schema, "工具根据城市返回实时气温",)
+    print(asyncio.run(tool.ainvoke({
+        "city":"Shanghai"
+    })))
 
-    mock_async_param_schema = {}
+
