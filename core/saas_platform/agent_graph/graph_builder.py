@@ -30,11 +30,8 @@ from langchain_core.tools import InjectedToolCallId
 from typing import Annotated
 from langchain.messages import ToolMessage, AIMessage
 
+# 显式引入langsmith的tracer
 tracer = get_langsmith_tracer()
-
-# print("LANGSMITH_TRACING =", os.getenv("LANGSMITH_TRACING"))
-# print("LANGSMITH_API_KEY =", bool(os.getenv("LANGSMITH_API_KEY")))
-# print("LANGSMITH_PROJECT =", os.getenv("LANGSMITH_PROJECT"))
 
 tenant_id = UUID("b7c84a42f0e941d29943d4f5e6f0f9da")
 tool_context = ToolContext(tenant_id=tenant_id)
@@ -112,8 +109,6 @@ async def build_tenant_graph(tenant_id:UUID, db:AsyncSession):
         build_worker_handoff_tool(worker_name) for worker_name in avaliable_workers
     ]
 
-    # print(f"从plugin读取的worker组装完毕：共有这些worker{worker_names}")
-
     # 2.加载租户自定义工具
     tool_query = await db.execute(
         select(TenantTool).where(TenantTool.tenant_id==tenant_id, TenantTool.enabled==True)
@@ -179,6 +174,7 @@ async def main_func():
         graph = await build_tenant_graph(user_id, db)
         print(graph.get_graph().draw_mermaid())
 
+        # test llm's tool
         query1 = f"帮我查询tenant_id为{user_id}的云盘剩余可用空间"
         query2 = f"帮我查询tenant_id为{user_id}的近7天api调用趋势"
 
