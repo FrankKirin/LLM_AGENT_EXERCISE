@@ -138,25 +138,41 @@ async def init_tenanttool(tenant_id:UUID):
             tenant_id=selected_tenant_id,
             tool_name="calculate_add",
             description="计算两个整数的和",
-            param_schema={"a":"int", "b":"int"},
+            param_schema={
+                "type": "object",
+                "a": {
+                    "type": "integer",
+                    "description": "相加的数"
+                },
+                "b": {
+                    "type": "integer",
+                    "description": "相加的数"
+                },
+            },
             runnable_code=textwrap.dedent("""def tool_func(a:int, b:int):
                             return a+b""").strip(),
             enabled=True, 
         )
         run_code ="""
-                from uuid import UUID
-                async def tool_func(tenant_id:UUID)->int:
-                    async with AsyncSessionLocal() as db:
-                        rows = await db.execute(select(StorageInfo)
-                                                .where(StorageInfo.tenant_id == tenant_id))
-                        res = rows.scalar_one_or_none()
-                        return res.remaining_space if res else 0
+            from uuid import UUID
+            from core.saas_platform.models.storage import StorageInfo
+            from sqlalchemy import select
+            from core.saas_platform.db.session import AsyncSessionLocal
+            async def tool_func(context)->int:    
+                async with AsyncSessionLocal() as db:        
+                    tenant_id = UUID(context.tenant_id)
+                    rows = await db.execute(select(StorageInfo).where(StorageInfo.tenant_id == tenant_id))
+                    res = rows.scalar_one_or_none()        
+                    return res.remaining_space if res else 0
                 """
         tenant_tool2 = TenantTool(
             tenant_id=selected_tenant_id,
             tool_name="fetch_storage_info",
             description="获取用户剩余可用云盘空间",
-            param_schema={"tenant_id":"UUID"},
+            param_schema={
+                "type": "object",
+                "properties": {},
+            },
             runnable_code=textwrap.dedent(run_code).strip(),
             enabled=True, 
         )

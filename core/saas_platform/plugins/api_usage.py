@@ -1,29 +1,32 @@
 from typing import Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, func
+from core.saas_platform.context.tool_context import ToolContext
 from core.saas_platform.db.session import AsyncSessionLocal
 from core.saas_platform.models.tenant import TokenUsageLog
 from core.saas_platform.plugins.base_plugin import BaseAgentPlugin
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict
-from uuid import UUID
+from langgraph.runtime import Runtime
 
 class ApiUsageState(TypedDict):
-    trend: list[dict]
+    result: list[dict]
 
 class ApiUsage(BaseAgentPlugin):
     def __init__(self, plugin_config: dict):
         super().__init__(plugin_config)
-        # self.tenant_id = UUID(plugin_config.get("tenant_id"))
 
     def build_sub_graph(self) -> tuple[str, Any]:
-        # 固定一个UUID
-        # tenant_id = self.tenant_id
-        tenant_id = UUID("bc7ddf790000485cafe0cd633a1d3f02")
-        to = datetime.now(timezone.utc).date()
-        from_ = to - timedelta(days=6)
-        async def get_token_usage(state:ApiUsageState, tenant=tenant_id, from_=from_):
+        async def get_token_usage(
+                state: ApiUsageState,
+                runtime: Runtime[ToolContext],
+            ):
+            to = datetime.now(timezone.utc).date()
+            from_ = to - timedelta(days=6)
             async with AsyncSessionLocal() as db:
+                print(f"runtime的context内容:{runtime.context}")
+                tenant_id = runtime.context.tenant_id
+
                 stmt = (
                     select(
                         # label就是给字段取个名字，方便取值，例如row.date
@@ -31,12 +34,13 @@ class ApiUsage(BaseAgentPlugin):
                         func.sum(TokenUsageLog.completion_tokens 
                                 + TokenUsageLog.prompt_tokens).label("total_tokens"),
                     ).where(
-                        TokenUsageLog.tenant_id == tenant,
+                        TokenUsageLog.tenant_id == tenant_id,
                         TokenUsageLog.created_at >= from_
                     )
                     .group_by(func.date(TokenUsageLog.created_at))
                     .order_by(func.date(TokenUsageLog.created_at))
                 )
+
                 rows = (await db.execute(stmt)).all() # {(created_at, total_sum)}
                 results = { str(row[0]):row[1] for row in rows}
             existed_date = [str(d) for d in results]
@@ -46,9 +50,12 @@ class ApiUsage(BaseAgentPlugin):
                 trend.append({"date":date, 
                               "usage": 0 if date not in existed_date else results.get(date)})
             # 返回字典，框架会自动把字典更新到state
-            return {"trend": trend}
+            return {"result": trend}
 
-        graph = StateGraph(ApiUsageState)
+        graph = StateGraph(
+            ApiUsageState,
+            context_schema=ToolContext,
+        )
         graph.add_node("token_usage", get_token_usage)
 
         graph.add_edge(START, "token_usage")

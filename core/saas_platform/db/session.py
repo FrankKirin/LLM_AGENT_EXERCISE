@@ -1,11 +1,16 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from core.saas_platform.db.base import db_settings
+import json
 
 async_engine = create_async_engine(
     db_settings.DATABASE_URL,
     echo=db_settings.DB_ECHO,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    json_serializer = lambda obj: json.dumps(
+        obj,
+        ensure_ascii=False
+    ),
 )
 
 # 这是一个数据库异步session工厂

@@ -1,3 +1,4 @@
+from langchain_core.tracers.langchain import wait_for_all_tracers
 import os
 from dotenv import load_dotenv
 load_dotenv(override=True)  # 刷新后台缓存变量
@@ -9,16 +10,6 @@ from langchain.messages import SystemMessage, HumanMessage
 from langgraph.graph.message import add_messages
 from langchain_core.tools import StructuredTool, tool
 from core.config import settings # 为什么这句代码没有让langsmith配置生效
-from langchain_core.tracers.langchain import wait_for_all_tracers
-import os
-
-class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]
-    next_step: str # 调度节点用来标记下一步派给谁
-    analysis_result: str
-    user_query: str
-    recent_res: str
-    reason: str
 
 llm = ChatOpenAI(
     model=settings.llm_model,
@@ -27,48 +18,13 @@ llm = ChatOpenAI(
     temperature=0.3
 )
 
-def build_supervisor_node(worker_names: list[str], tenant_tools: list[StructuredTool]):
-    llm = ChatOpenAI(
-        model=settings.llm_model,
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-        temperature=0
-    ).bind_tools(tenant_tools)
-
-    worker_options = "\n".join(f"-{name}" for name in worker_names)
-    tool_descriptions = "\n".join(
-       f"-{t.name}:{t.description} " for t in tenant_tools) if tenant_tools else "(无可用工具)"
-
-    # 真正被LangGraph调用的节点函数
-    async def supervisor_node(state):
-        messages = state["messages"]
-
-        system_prompt = f"""
-            你是一个Supervisor Agent。
-            你的任务是协调多个Worker完成用户请求。
-
-            可用Worker(可分配专项任务):
-            {worker_options}
-
-            可用的工具(可直接调用执行):
-            {tool_descriptions}
-
-            处理规则：
-            1.如果问题可以用工具直接解决，调用对应工具
-            2.如果问题需要专项能力，分配给对应Worker节点处理
-            3.工具调用严格使用标准Function Calling格式
-            4.所有结果最终整合为完整自然语言回答
-        """.strip()
-
-        try:
-            response = await llm.ainvoke(
-                [SystemMessage(content = system_prompt)] + state["messages"]
-            )
-        except Exception as e:
-            raise ValueError("LLM返回报错")
-
-        return {"messages": [response]}
-    return supervisor_node
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    next_step: str # 调度节点用来标记下一步派给谁
+    analysis_result: str
+    user_query: str
+    recent_res: str
+    reason: str
 
 # Mocked Worker
 def analysis_worker(state: AgentState):

@@ -10,13 +10,14 @@ mock_weather = {
         "unit": "C",
     }
 }
+
 from typing import Any
 from langgraph.graph import START, StateGraph, END
 from core.saas_platform.plugins.base_plugin import BaseAgentPlugin
 from typing import TypedDict
 
 class PluginState(TypedDict):
-    exec_result: dict
+    result: dict
 
 class FetchWeather(BaseAgentPlugin):
     def __init__(self, plugin_config: dict):
@@ -33,7 +34,7 @@ class FetchWeather(BaseAgentPlugin):
             if location:
                 res = mock_weather[location]
                 print(f"执行结果放入PluginState: {res}")
-                return {"exec_result": res}
+                return {"result": res}
 
         sub_graph = StateGraph(PluginState)
         sub_graph.add_node("call_weather", fetch_weather_info)
@@ -46,7 +47,7 @@ class FetchWeather(BaseAgentPlugin):
         return "weather_worker", compiled_subgraph
 
 # if __name__ == "__main__":
-#     import asyncio
-#     fetch_weather = FetchWeacher(plugin_config={"location":"Beijing"})
-#     name, graph = fetch_weather.build_sub_graph()
-#     asyncio.run(graph.ainvoke({"exec_result":{}}))
+    # import asyncio
+    # fetch_weather = FetchWeacher(plugin_config={"location":"Beijing"})
+    # name, graph = fetch_weather.build_sub_graph()
+    # asyncio.run(graph.ainvoke({"exec_result":{}}))
