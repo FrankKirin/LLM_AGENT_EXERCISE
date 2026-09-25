@@ -6,7 +6,6 @@
 """
 import dotenv
 dotenv.load_dotenv(override=True)
-import os
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
