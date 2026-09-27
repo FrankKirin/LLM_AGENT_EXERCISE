@@ -99,7 +99,9 @@ dependencies = [
     "multidict==6.7.1",
     "numpy==2.4.6",
     "oauthlib==3.3.1",
-    "onnxruntime==1.23.2",
+    "onnxruntime==1.23.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    # Intel Mac 使用兼容 macOS 12 的版本
+    "onnxruntime==1.16.3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     "openai==2.45.0",
     "opentelemetry-api==1.44.0",
     "opentelemetry-exporter-otlp-proto-common==1.44.0",
