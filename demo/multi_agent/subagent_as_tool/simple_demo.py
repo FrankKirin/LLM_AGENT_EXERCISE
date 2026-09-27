@@ -75,7 +75,7 @@ def researcher_route(state:ResearchState):
 researcher_builder = StateGraph(ResearchState)
 
 researcher_builder.add_node("researcher_llm", researcher_llm)
-researcher_builder.add_node("reserach_tools", ToolNode([search_web]))
+researcher_builder.add_node("research_tools", ToolNode([search_web]))
 
 researcher_builder.add_edge(START, "researcher_llm")
 
@@ -101,6 +101,8 @@ def ask_researcher(task: str)->str:
         }
     )
     return result["messages"][-1].content
+
+result = ask_researcher.invoke({"task": "什么是langgraph?"})
 
 # 三、Supervisor Agent
 
