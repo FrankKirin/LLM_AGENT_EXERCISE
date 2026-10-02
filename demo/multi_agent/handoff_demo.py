@@ -92,6 +92,3 @@ result = graph.invoke({
     "current_agent": "support",
     "result": "",
 })
-
-print("\n最终 State：")
-print(result)
