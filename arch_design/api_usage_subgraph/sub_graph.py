@@ -1,41 +1,56 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.runtime import Runtime
-from arch_design.api_usage_subgraph.base_data import APIUsageState, AppContext
+from arch_design.api_usage_subgraph.base_data import APIUsageState, AppContext, APIUsageReport, CauseEvidence
 from core.lc_baseline import llm
 from langchain.messages import SystemMessage, HumanMessage
 from langgraph.prebuilt import ToolNode
 import json
 from langchain.tools import tool
+from langgraph.types import RetryPolicy
+from sqlalchemy.exc import OperationalError
 
 MAX_TOOL_CALLS = 8
 MAX_SAME_ACTION_ROUNDS = 3
 
-def query_api_usage(state: APIUsageState, runtime: Runtime[AppContext]):
-    """
-        输入：state和runtime, 查询指定日期范围内的数据 
-    """
-    tenant_id = runtime.context["tenant_id"]
-
-    print(
-        f"\n[API Usage] 查询租户 {tenant_id} "
-        f"的调用数据：{state['start_date']} ~ {state['end_date']}"
+# @tool
+# 第一层错误处理: 
+# def query_api_usage(start_date: str, end_date: str):
+def query_api_usage(state: APIUsageState):
+    """查询指定日期范围内的API调用记录"""
+    try:
+        rows = [
+            {"date": "2026-10-05", "calls": 1000},
+            {"date": "2026-10-06", "calls": 1200},
+            {"date": "2026-10-07", "calls": 1300},
+            {"date": "2026-10-08", "calls": 1400},
+            {"date": "2026-10-09", "calls": 1500},
+            {"date": "2026-10-10", "calls": 1500},
+            {"date": "2026-10-11", "calls": 9200},
+        ]
+    except (OperationalError, TimeoutError):
+        # 只处理可以明确是别的可预期错误(瞬态错误)
+        # 不把所有Exception都吞掉
+        # obj to str
+        return json.dumps(
+            {
+                "ok": False,
+                "error_code": "QUERY_TEMPORARY_FAILURE",
+                "retryable": True,  # 不会自动触发重试，需要通过Agent提示词、重试计数或确定性的逻辑控制
+                "message": (
+                    "查询暂时失败，可以有限重试；"
+                    "如果仍然失败，应报告任务未完成"
+                ),
+            },
+            ensure_ascii=False
+        )
+    return json.dumps(
+        {
+            "ok": True,
+            "data": rows,
+        },
+        ensure_ascii=False,
+        default=str  # 这里default的作用是什么，不写行吗？
     )
-
-    # 模拟 SQL 查询结果，不是真实业务数据
-    rows = [
-        {"date": "2026-10-05", "calls": 1000},
-        {"date": "2026-10-06", "calls": 1200},
-        {"date": "2026-10-07", "calls": 1300},
-        {"date": "2026-10-08", "calls": 1400},
-        {"date": "2026-10-09", "calls": 1500},
-        {"date": "2026-10-10", "calls": 1500},
-        {"date": "2026-10-11", "calls": 9200},
-    ]
-
-    # 输出：写入子图的 State Update
-    return {
-        "api_result": rows
-    }
 
 def detect_anomaly(state: APIUsageState):
     rows = state["api_result"]
@@ -126,7 +141,7 @@ def investigator_llm(state: APIUsageState):
                  "如果不够，继续调用合适的工具。不得将未经证实的假设描述为事实。"
             )
     )
-    
+
     response = investigator_model.invoke(
         [
             system_message,
@@ -163,8 +178,50 @@ def analyze_causes(state: APIUsageState):
         "possible_causes": causes
     }
 
+# 构建api_usage_report
+def build_api_usage_report(state):
+    # 按照APIUsageReport数据要求生成APIUsageReport
+    rows = state["api_result"]
+
+    if not rows:
+        report = APIUsageReport(
+            status="insufficient_data",
+            start_date=state["start_date"],
+            end_date=state["end_date"],
+
+            anomaly_detected=None,
+
+            trend_summary="没有获得足够的API调用记录",
+            limitations=["无法基于现有数据判断调用趋势"],
+        )
+    # rows内容为空的情况
+    else:
+        causes = [
+            CauseEvidence(
+                cause=cause,
+                evidence=[],
+                confidence="low",
+                need_verification=True,
+            )
+            for cause in state["possible_causes"]
+        ]
+        report  = APIUsageReport(
+            status="completed",
+            start_date=state["start_date"],
+            end_date=state["end_date"],
+            anomaly_detected=state["anomaly_detected"],
+            trend_summary="已完成指定日期范围内的API调用分析",
+            possible_causes=causes,
+            limitations=(
+                [] if not state["anomaly_detected"] else ["可能原因仍需结合真实日志验证"]
+            ),
+        )
+    return {
+        "api_usage_report": report.model_dump(mode="json")
+    }
+
 # Loop Guard节点，做执行前检查
-def guard_tool_calls(state: APIUsageState):
+def guard_tool_calls_1(state: APIUsageState):
     last_message = state["messages"][-1]
     tool_calls = last_message.tool_calls
 
@@ -237,14 +294,81 @@ def loop_guard_stop(state: APIUsageState):
         "possible_causes": [message]
     }
 
+def tool_signature(tool_calls: list[dict])->str:
+    """把同一组工具调用规范化，便于比较是否重复。"""
+    normalized_calls = sorted(
+        json.dumps(
+            {
+                "name": call["name"],
+                "args": call["args"],
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            )
+        for call in tool_calls
+    )
+
+    return "|".join(normalized_calls)
+
+def guard_tool_calls(state: dict)->dict:
+    """同一组工具调用最多执行两次。"""
+    last_message = state["messages"][-1]
+    signature = tool_signature(last_message.tool_calls)
+
+    # count是个dict，用于记录不同函数调用次数
+    # 相同参数不一定永远代表死循环，实际生产系统应该结合错误类型判断；是否允许重试、上一次工具结果是否成功
+    # 是否出现了新证据等
+    counts = dict(state.get("tool_signature_counts", {}))
+    counts[signature] = counts.get(signature, 0) + 1
+
+    blocked = counts[signature] > 2
+
+    return {
+        "tool_signagure_counts": counts,
+        "loop_guard_triggered": blocked,
+        "loop_guard_reason": (
+            "同一组工具调用超过允许次数"
+            if blocked else None
+        ),
+    }
+
+def finalize_failed(state: dict)->dict:
+    # 符合APIUsageReport的输出结构
+    # 不会因为查询失败，假装已经得出没有异常的结论
+    # error_code可以帮助父图或监控系统判断失败类型
+    # 父图不必了解子图内部究竟运行了多少轮ReAct循环
+    report = APIUsageReport(
+        status="failed",
+        start_date=state["start_date"],
+        end_date=state["end_date"],
+        anomaly_detected=None,
+        trend_summary="",
+        possible_causes=[],
+        limitations=["本次分析未能成功完成，不能据此判断是否存在异常"],
+        error_code=(
+            "LOOP_GUARD" if state.get("loop_guard_triggered") else "ANALYSIS_FAILED"
+        ),
+    )
+    return {
+        "report": report.model_dump(mode="json")
+    }
+
 # 新的子图
 api_builder = StateGraph(APIUsageState, context_schema=AppContext)
 
 # 添加节点
+# 第二层错误处理
 api_builder.add_node("query_api_usage", query_api_usage)
 api_builder.add_node("detect_anomaly", detect_anomaly)
 api_builder.add_node("prepare_investigation", prepare_investigation)
-api_builder.add_node("investigator_llm", investigator_llm)
+api_builder.add_node(
+    "investigator_llm", 
+    investigator_llm, 
+    retry_policy=RetryPolicy(
+        max_attempts=3,
+        retry_on=(TimeoutError, ConnectionError), # 符合retry_on的异常，最多尝试3次，包括第一次执行
+    )
+)
 # ToolNode会接收大模型发出的工具调用请求，并实际执行，然后返回执行结果
 api_builder.add_node("investigation_tools", ToolNode(investigation_tools, handle_tool_errors=True))
 api_builder.add_node("finish_investigation", finish_investigation)
@@ -336,3 +460,9 @@ print(res["possible_causes"])
 # 第二层：Loop Guard 检查重复动作
 #         ↓
 # 第三层：recursion_limit 兜底
+
+# API Usage Agent的故障处理
+# 1.工具执行：可识别的错误；未预期的错误暴露出来, 配合retry_policy
+# 2.Agent Loop, Loop Guard限制重复调用；进展判断避免工具重复执行却不产生新信息
+# 3.结果校验：JSON解析、Pydantic校验、业务语义校验、有限修复
+# 4.结果契约；子图输出completed、insufficient_date或failed；父图只消费经过校验的业务结果

@@ -26,7 +26,9 @@ def supervisor(state: ParentState) -> Command:
 
     return Command(goto=END)
 
+# 构建api_usage_report
 def build_api_usage_report(state):
+    # 按照APIUsageReport数据要求生成APIUsageReport
     rows = state["api_result"]
 
     if not rows:
@@ -34,10 +36,13 @@ def build_api_usage_report(state):
             status="insufficient_data",
             start_date=state["start_date"],
             end_date=state["end_date"],
+
             anomaly_detected=None,
+
             trend_summary="没有获得足够的API调用记录",
             limitations=["无法基于现有数据判断调用趋势"],
         )
+    # rows内容为空的情况
     else:
         causes = [
             CauseEvidence(
@@ -63,18 +68,27 @@ def build_api_usage_report(state):
         "api_usage_report": report.model_dump(mode="json")
     }
 
+
 # 调用子图, 接收结果时，再做一次边界校验
 def run_api_usage(state: ParentState, runtime: Runtime[AppContext]):
-    # 父图传给子图的字段映射到子图输入
+    # 父图数据映射后给到子图作为输入
     child_input: APIUsageState = {
+        "messages": [],
         "user_query": state["user_query"],
         "start_date": state["start_date"],
         "end_date": state["end_date"],
+
         "api_result": [],
         "anomaly_detected": False,
         "history_result": "",
         "rag_result": "",
+
         "possible_causes": [],
+        "tool_call_count":0,
+        "last_action_signature":"",
+        "same_action_count":0,
+        "loop_guard_triggered": False,
+        "stop_reason":"",
     }
 
     child_result = api_usage_graph.invoke(
@@ -85,6 +99,10 @@ def run_api_usage(state: ParentState, runtime: Runtime[AppContext]):
     report = APIUsageReport.model_validate(
         child_result["api_usage_report"]
     )
+
+    return {
+        "api_usage_report": report.model_dump(mode="json")
+    }
 
 # 父图对子图返回的report验证后处理结果
 def route_after_api_usage(state):
@@ -100,7 +118,7 @@ def route_after_api_usage(state):
     if report.anomaly_detected:
         return "summarize_anomaly"
 
-    return "summarize_normal"
+    return "summarize"
 
 def summarize(state: ParentState):
     rows = state["api_result"]
@@ -131,6 +149,7 @@ def summarize(state: ParentState):
         "final_answer": answer
     }
 
+# 构建图
 parent_builder = StateGraph(ParentState, context_schema=AppContext)
 
 parent_builder.add_node("supervisor", supervisor)
