@@ -12,46 +12,7 @@ import time
 import hashlib
 from fastapi import Header, HTTPException, status
 from core.structured_logger import log_error, log_warning
-
-class APIKeyManager:
-    """API Key管理器"""
-    def __init__(self):
-        self.api_keys: dict[str, dict] = {
-            "sk-test-123456": {
-                "user_id": "test_uer",
-                "permissions": ["chat", "rag"],
-                "rate_limit": 100,
-                "enabled": True # enabled为True表示api_key可用
-            }
-        }
-
-    def validate_key(self, api_key: str) -> dict | None:
-        info = self.api_keys.get(api_key)
-        return info if info and info.get("enabled") else None
-
-    def check_permission(self, api_key: str, permission: str) -> bool:
-        """
-            输入：
-                API_key和权限
-            处理：
-                验证API_key是否合法，API_key中是否包含了需要鉴定的权限
-            输出：
-                True 或者 False
-        """
-        # # 我的实现
-        # info = self.api_keys.get(api_key)
-        # if info:
-        #     permissions = info.get("permissions")
-        #     if permissions and permission in permissions:
-        #         return True
-        # return False
-        # 如果info存在，并且permisson在permissions里面，就返回True，否则返回False
-        info = self.api_keys.get(api_key)
-        return bool(
-            info and permission in info.get("permissions", [])
-        )
-
-api_key_manager = APIKeyManager()
+from core.security.api_manager import api_key_manager
 
 # x_api_key，默认从HTTP请求的Header中找, ...表示这个参数必填，没有提供就报错
 def verify_api_key(x_api_key: str=Header(..., alias="X-API-KEY")) -> dict:
@@ -60,6 +21,7 @@ def verify_api_key(x_api_key: str=Header(..., alias="X-API-KEY")) -> dict:
         log_warning("API Key验证失败", prefix=x_api_key[:8] if x_api_key else "empty")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的API Key")
 
+# 输入安全
 class InputValidator:
     MAX_INPUT_LENGTH = 1000
     SENSITIVE_PATTERNS = [
@@ -92,6 +54,7 @@ class InputValidator:
         )
         return res.strip()
 
+# 输出脱敏
 class OutputFiler:
     """输出脱敏"""
     PII_PATTERNS = {
