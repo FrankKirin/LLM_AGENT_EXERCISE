@@ -21,7 +21,7 @@ def verify_api_key(x_api_key: str=Header(..., alias="X-API-KEY")) -> dict:
         log_warning("API Key验证失败", prefix=x_api_key[:8] if x_api_key else "empty")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的API Key")
 
-# 输入安全
+# 输入安全检查
 class InputValidator:
     MAX_INPUT_LENGTH = 1000
     SENSITIVE_PATTERNS = [
@@ -33,7 +33,7 @@ class InputValidator:
 
     @classmethod
     def validate(cls, text:str) -> tuple[bool, str]:
-        # 输入为空、输入过长、
+        # 输入为空、输入过长
         if not text or not text.strip():
             return False, "输入文本不能为空"
         if len(text) > cls.MAX_INPUT_LENGTH:
