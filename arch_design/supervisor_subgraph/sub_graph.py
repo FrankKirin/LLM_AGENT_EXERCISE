@@ -333,7 +333,7 @@ api_builder.add_node(
     "investigator_llm", 
     investigator_llm, 
     retry_policy=RetryPolicy(
-        max_attempts=3,
+        max_attempts=3,  # 总调用次数为3，而不是调用失败后重试3次
         retry_on=(TimeoutError, ConnectionError), # 符合retry_on的异常，最多尝试3次，包括第一次执行
     )
 )
