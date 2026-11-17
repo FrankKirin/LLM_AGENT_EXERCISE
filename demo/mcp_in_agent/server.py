@@ -45,6 +45,7 @@ class OrderStatus(BaseModel):
 # 4.定义Tool: 查询订单状态
 # @mcp.tool()注解，方法首段写注释，函数的作用、参数、返回值
 # 输入order_id, 输出OrderStatus对象
+@mcp.tool()
 def get_order_status(order_id: str) -> OrderStatus:
     # python SDK后根据类型注解生成对应的JSON Schema
     """
@@ -91,7 +92,6 @@ def search_orders(status:str, limit:int=5)->list[OrderStatus]:
     allowed_order_status = ["processing", "shipped", "delivered"]
 
     if normalized_status not in allowed_order_status:
-
         raise ToolError(f"订单状态错误，仅允许{allowed_order_status}")
 
     if limit < 1 or limit > 10:
@@ -99,9 +99,8 @@ def search_orders(status:str, limit:int=5)->list[OrderStatus]:
 
     order_result = []
     for order_id, order in ORDERS.items():
-        if order["status"] not in allowed_order_status:
+        if order["status"] != normalized_status:
             continue
-
         order_result.append(
             OrderStatus(
                 order_id=order_id,
@@ -110,7 +109,6 @@ def search_orders(status:str, limit:int=5)->list[OrderStatus]:
                 tracking_message=order["tracking_message"],
             )
         )
-
         if len(order_result) == limit:
             break
 
@@ -157,7 +155,6 @@ def analyze_order_issue(order_id:str, symptom: str)->str:
     注意：
     不允许编造订单系统中不存在的信息。
     """
-
 
 # 8.启动MCP Server
 if __name__ == "__main__":
