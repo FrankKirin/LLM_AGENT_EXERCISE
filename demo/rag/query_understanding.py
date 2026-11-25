@@ -5,6 +5,7 @@
 # 3. 继承上一轮对话的 Slot。
 # 4. 判断当前问题是否缺少必要 Slot。
 # 5. 将 Slot 转换成 Chroma Metadata Filter。
+from __future__ import annotations
 import json
 from pydantic import BaseModel, Field, ValidationError
 from typing import Any
@@ -19,7 +20,8 @@ Intent = Literal[
 ]
 
 class QuerySlots(BaseModel):
-    # 产品品牌、产品型号、产品组件、问题类型、症状
+    # 产品品牌、产品型号、产品组件、故障类型、症状
+    # slot根据实际业务要求自己定义
     product_brand: str|None = None
     product_model: str|None = None
     product_component: str|None = None
@@ -27,9 +29,12 @@ class QuerySlots(BaseModel):
     symptom: str|None = None
 
 class QueryAnalysis(BaseModel):
-    """Query的分析结果"""
+    """Query的分析结果
+       LLM单次输出结构：意图、是否追问、槽位，改写后的查询
+    """
     intent: Intent
     is_follow_up: bool = False
+    # =QuerySlots()那么类定义加载时执行一次，所有实例可能会共享一个可变对象
     slots: QuerySlots = Field(default_factory=QuerySlots)
     rewritten_query: str  # 查询重写的目的就是为了能让重写后的query更贴合检索器
 
@@ -46,6 +51,7 @@ class QueryContext(BaseModel):
     pending_slots: QuerySlots = Field(default_factory=QuerySlots)
 
 # 3.定义每种Intent对应必要的Slot
+# 澄清机制，基于意图的必要槽位校验
 INTENT_REQUIRED_SLOTS = {
     "general_qa":[],
     "product_specific_qa":["product_model"],
@@ -110,10 +116,40 @@ def get_missing_required_slots(
 
 def build_metadata_filter(
     slots: QuerySlots,
-    enable_metadata_fileds: set[str],
+    enable_metadata_fields: set[str],
 ) -> dict[str, Any] | None:
-    """只使用已经确认存在于知识库中的Metadata字段构造过滤条件"""
-    pass 
+    """
+    只使用已经确认存在于知识库中的Metadata字段构造过滤条件
+        输入:
+            enable_metadata_fields: 知识库中真实存在的元数据字段集合
+        处理：
+            单条件直接返回、多条件自动包装成$and,符合Chroma的filter语法
+        输出：
+    """
+    # 把已经提取到的槽位，转换成向量数据库Chroma能立即的的metadata过滤条件，缩小检索范围
+    slot_data = slots.model_dump()
+    conditions = []
+
+    for slot_name, metadata_field in METADATA_FILTER_FIELD_MAP.items():
+
+        if metadata_field not in enable_metadata_fields:
+            continue
+
+        slot_value = slot_data[slot_name]
+
+        if slot_value is None:
+            continue
+
+    if not conditions:  # 一个条件都没有，不过滤，纯语义检索
+        return None
+
+    if len(conditions) == 1:  # 只有一个条件，直接返回
+        return conditions[0]
+
+    # 多个条件，$and操作符，两个标签都要匹配
+    return {
+        "$and": conditions
+    }
 
 # ============================================================
 # 5. Query Understanding 主服务
@@ -141,10 +177,12 @@ class QueryUnderstandingService:
         context_data = {
             "last_query": context.last_query,
             "last_intent": context.last_intent,
+            # 当前活跃的槽位状态
             "active_slots": context.slots.model_dump(),
-            "pending_query": context.pending_query,
-            "pending_intent": context.pending_intent,
-            "pending_slots": context.pending_slots.model_dump(),
+            # 待补全问题的“挂起状态”
+            "pending_query": context.pending_query,  # 上一轮缺少必要槽位发起追问的原始问题
+            "pending_intent": context.pending_intent,  # 挂起问题的原始意图
+            "pending_slots": context.pending_slots.model_dump(),  # 挂起问题已有的槽位
         }
 
         prompt = f"""
@@ -181,8 +219,7 @@ class QueryUnderstandingService:
     1. 不确定的信息必须填写 null，不能猜测型号或故障。
     2. 用户明确提供的新信息优先于历史信息。
     3. 如果 pending_query 不为空，说明系统上一轮正在等待用户补充信息。
-    此时应当把当前输入理解为对原始问题的补充，
-    保留原始问题的 Intent 和已有 Slot。
+    此时应当把当前输入理解为对原始问题的补充，保留原始问题的 Intent 和已有 Slot。
     4. 如果用户是在延续上一轮问题，应设置 is_follow_up=true。
     5. 如果用户切换到全新的问题，应设置 is_follow_up=false。
     6. rewritten_query 必须是一个完整、明确、可以独立检索的问题。
@@ -225,13 +262,15 @@ class QueryUnderstandingService:
             return QueryAnalysis.model_validate(data)
         except (json.JSONDecodeError, ValidationError) as exc:
             # JSONDecodeError解决文本不是合法JSON，解析阶段失败
-            # ValidationError解决JSON合法，但是
+            # ValidationError解决JSON合法，但是Schema不合法的情况
             raise ValueError(
                 "Query Understanding返回的数据不符合Schema约定"
             ) from exc
 
     def run(self, user_query:str, context: QueryContext) -> QueryUnderstandingResult:
-        """完成问题理解、上下文合并、必要Slot判断和Filter构造"""
+        """完成问题理解、上下文合并、必要Slot判断和Filter构造
+           处理：提取5个预设的slot; 判断intent； 改写可独立检索的query
+        """
         # 1.提取Intent和当前问题的Slot
         analysis = self._extract_with_llm(
             user_query=user_query,
@@ -243,21 +282,21 @@ class QueryUnderstandingService:
         # - 普通多轮对话，只继承稳定的产品身份信息
         # - 全新问题，不继承上一轮Slot
         pending_reply = context.pending_query is not None
-        if pending_reply:
+        if pending_reply:  # 回答追问, 系统主动追问
             intent = context.pending_intent or analysis.intent
             resolved_slots = merge_slots(
                 current_slots=analysis.slots,
                 previous_slots=context.pending_slots,
                 inherit_fields=ALL_SLOT_FIELDS,
             )
-        elif analysis.is_follow_up:
+        elif analysis.is_follow_up:  # 上一轮追问(普通追问), 用户自己追问
             intent = analysis.intent
             resolved_slots = merge_slots(
                 current_slots=analysis.slots,
                 previous_slots=context.slots,
                 inherit_fields=IDENTITY_SLOT_FIELDS,
             )
-        else:
+        else: # is_follow_up=False的场景
             intent = analysis.intent
             resolved_slots = analysis.slots
 
@@ -272,18 +311,18 @@ class QueryUnderstandingService:
         clarification_question = None
 
         if needs_clarification:
-            # 当前市里一次询问一个最关键的缺失字段
+            # 单字段追问策略，一次只问一个最关键的缺失字段
+            # 追问状态持久化：如果补全后仍有确实，pending_query会继续保留原始问题，形成”渐进式补全“
              clarification_question = SLOT_QUESTIONS[missing_slots[0]]
 
         # 4.构造Chroma Filter
         metadata_filter = build_metadata_filter(
             slots=required_slots,
-            enable_metadata_fileds=self.enabled_metadata_fields,
+            enable_metadata_fields=self.enabled_metadata_fields,
         )
 
         # 5.保存下一轮需要的对话上下文
         if needs_clarification:
-            # 用户补充了一个字段但是还是其他字段缺失，保留最初等待完成的问题
             pending_query = (
                 context.pending_query if pending_reply else user_query
             )
@@ -319,12 +358,15 @@ class QueryUnderstandingService:
 # ============================================================
 
 class QueryUnderstandingResult(BaseModel):
-    intent: Intent
-    slots: QuerySlots
-    rewritten_query: str
-    required_slots: list[str] = Field(default_factory=list)
-    missing_slots: list[str] = Field(default_factory=list)
+    intent: Intent  # 意图
+    slots: QuerySlots  # 槽位
+    rewritten_query: str  # 重写后，适合检索的query
+
+    required_slots: list[str] = Field(default_factory=list) # 必须的槽位
+    missing_slots: list[str] = Field(default_factory=list)  # 缺失的槽位
+
     needs_clarification: bool = False
     clarification_question: str|None = None
+
     metadata_filter: dict[str, Any] | None = None
-    next_context: QueryContext
+    next_context: QueryContext  # 作用是什么？为什么要有这个变量
